@@ -67,8 +67,8 @@
 
 {% block extra_js %}
 <script>
-/* 全局状态变量，供全局函数访问 */
-const state = {
+/* 日历管理页面私有状态变量 */
+const calendarState = {
     events: [],
     currentMonth: null,
     filterTrack: '',
@@ -85,11 +85,17 @@ function initCalendarPage() {
     async function loadEvents() {
         try {
             const resp = await fetch('/api/timeline');
-            state.events = await resp.json();
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            calendarState.events = await resp.json();
             renderCalendar();
             renderEventList();
         } catch (e) {
             console.error('加载时间线失败', e);
+            // 显示错误信息，避免永远停在"加载中..."
+            const grid = document.getElementById('calendar-grid');
+            const list = document.getElementById('event-list');
+            if (grid) grid.innerHTML = '<p class="placeholder" style="color:#e74c3c;">加载失败，请刷新页面</p>';
+            if (list) list.innerHTML = '<p class="placeholder" style="color:#e74c3c;">加载失败，请刷新页面</p>';
         }
     }
 
@@ -105,15 +111,15 @@ function initCalendarPage() {
             const endMonth = 12;
             for (let month = startMonth; month <= endMonth; month++) {
                 const monthStr = `${year}-${String(month).padStart(2, '0')}`;
-                const monthEvents = state.events.filter(e => e.month === monthStr);
+                const monthEvents = calendarState.events.filter(e => e.month === monthStr);
 
                 // 应用筛选
                 let filteredEvents = monthEvents;
-                if (state.filterTrack) {
-                    filteredEvents = filteredEvents.filter(e => e.track === state.filterTrack);
+                if (calendarState.filterTrack) {
+                    filteredEvents = filteredEvents.filter(e => e.track === calendarState.filterTrack);
                 }
-                if (state.filterStatus) {
-                    filteredEvents = filteredEvents.filter(e => e.status === state.filterStatus);
+                if (calendarState.filterStatus) {
+                    filteredEvents = filteredEvents.filter(e => e.status === calendarState.filterStatus);
                 }
 
                 months.push({
@@ -166,7 +172,7 @@ function initCalendarPage() {
 
     /* 显示月份详情 */
     function showMonthDetail(month) {
-        state.currentMonth = month;
+        calendarState.currentMonth = month;
         const section = document.getElementById('month-detail-section');
         const title = document.getElementById('month-detail-title');
         const content = document.getElementById('month-detail-content');
@@ -175,12 +181,12 @@ function initCalendarPage() {
         title.textContent = `${year}年${monthNum}月节点`;
 
         // 筛选该月的节点
-        let monthEvents = state.events.filter(e => e.month === month);
-        if (state.filterTrack) {
-            monthEvents = monthEvents.filter(e => e.track === state.filterTrack);
+        let monthEvents = calendarState.events.filter(e => e.month === month);
+        if (calendarState.filterTrack) {
+            monthEvents = monthEvents.filter(e => e.track === calendarState.filterTrack);
         }
-        if (state.filterStatus) {
-            monthEvents = monthEvents.filter(e => e.status === state.filterStatus);
+        if (calendarState.filterStatus) {
+            monthEvents = monthEvents.filter(e => e.status === calendarState.filterStatus);
         }
 
         // 按日期排序（有具体日期的排前面）
@@ -240,7 +246,7 @@ function initCalendarPage() {
     /* 隐藏月份详情 */
     document.getElementById('btn-close-detail').addEventListener('click', () => {
         document.getElementById('month-detail-section').style.display = 'none';
-        state.currentMonth = null;
+        calendarState.currentMonth = null;
     });
 
     /* 渲染节点列表 */
@@ -249,7 +255,7 @@ function initCalendarPage() {
         const search = document.getElementById('detail-search');
         const query = search.value.toLowerCase();
 
-        let filteredEvents = state.events;
+        let filteredEvents = calendarState.events;
         if (query) {
             filteredEvents = filteredEvents.filter(e =>
                 e.title.toLowerCase().includes(query) ||
@@ -259,11 +265,11 @@ function initCalendarPage() {
         }
 
         // 应用筛选
-        if (state.filterTrack) {
-            filteredEvents = filteredEvents.filter(e => e.track === state.filterTrack);
+        if (calendarState.filterTrack) {
+            filteredEvents = filteredEvents.filter(e => e.track === calendarState.filterTrack);
         }
-        if (state.filterStatus) {
-            filteredEvents = filteredEvents.filter(e => e.status === state.filterStatus);
+        if (calendarState.filterStatus) {
+            filteredEvents = filteredEvents.filter(e => e.status === calendarState.filterStatus);
         }
 
         // 按月份排序
@@ -313,31 +319,31 @@ function initCalendarPage() {
 
     /* 筛选 */
     document.getElementById('filter-track').addEventListener('change', (e) => {
-        state.filterTrack = e.target.value;
+        calendarState.filterTrack = e.target.value;
         renderCalendar();
-        if (state.currentMonth) {
-            showMonthDetail(state.currentMonth);
+        if (calendarState.currentMonth) {
+            showMonthDetail(calendarState.currentMonth);
         }
         renderEventList();
     });
 
     document.getElementById('filter-status').addEventListener('change', (e) => {
-        state.filterStatus = e.target.value;
+        calendarState.filterStatus = e.target.value;
         renderCalendar();
-        if (state.currentMonth) {
-            showMonthDetail(state.currentMonth);
+        if (calendarState.currentMonth) {
+            showMonthDetail(calendarState.currentMonth);
         }
         renderEventList();
     });
 
     document.getElementById('btn-clear-filter').addEventListener('click', () => {
-        state.filterTrack = '';
-        state.filterStatus = '';
+        calendarState.filterTrack = '';
+        calendarState.filterStatus = '';
         document.getElementById('filter-track').value = '';
         document.getElementById('filter-status').value = '';
         renderCalendar();
-        if (state.currentMonth) {
-            showMonthDetail(state.currentMonth);
+        if (calendarState.currentMonth) {
+            showMonthDetail(calendarState.currentMonth);
         }
         renderEventList();
     });
@@ -351,13 +357,8 @@ function initCalendarPage() {
     loadEvents();
 }
 
-/* 辅助函数 */
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+/* 辅助函数 - 使用 app.js 中的 esc 函数 */
+const escapeHtml = esc;
 
 function getStatusClass(status) {
     const classMap = {
@@ -387,43 +388,94 @@ function getTrackBadgeClass(track) {
 
 /* 暴露全局函数供 onclick 使用 */
 window.editEvent = function(id) {
-    const event = state.events.find(e => e.id === id);
+    const event = calendarState.events.find(e => e.id === id);
     if (event) {
         openEvModal(event);
     }
 };
 
-window.deleteEvent = function(id) {
-    const event = state.events.find(e => e.id === id);
+window.deleteEvent = async function(id) {
+    const event = calendarState.events.find(e => e.id === id);
     if (!event) return;
     if (confirm(`确认删除节点「${event.title}」？`)) {
-        fetch(`/api/timeline/${id}`, { method: 'DELETE' })
-            .then(resp => {
-                if (resp.ok) {
-                    initCalendarPage();
-                } else {
-                    alert('删除失败');
+        try {
+            const resp = await fetch(`/api/timeline/${id}`, { method: 'DELETE' });
+            if (!resp.ok) throw new Error('删除失败');
+            // 重新加载数据，不重复初始化
+            const loadResp = await fetch('/api/timeline');
+            calendarState.events = await loadResp.json();
+            // 调用内部渲染函数
+            const renderCalendar = () => {
+                const grid = document.getElementById('calendar-grid');
+                if (!grid) return;
+                const months = [];
+                for (let year = 2026; year <= 2027; year++) {
+                    const startMonth = year === 2026 ? 7 : 1;
+                    const endMonth = 12;
+                    for (let month = startMonth; month <= endMonth; month++) {
+                        const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+                        const monthEvents = calendarState.events.filter(e => e.month === monthStr);
+                        let filteredEvents = monthEvents;
+                        if (calendarState.filterTrack) {
+                            filteredEvents = filteredEvents.filter(e => e.track === calendarState.filterTrack);
+                        }
+                        if (calendarState.filterStatus) {
+                            filteredEvents = filteredEvents.filter(e => e.status === calendarState.filterStatus);
+                        }
+                        months.push({month: monthStr, year, monthNum: month, filteredEvents, eventCount: filteredEvents.length});
+                    }
                 }
-            });
+                grid.innerHTML = months.map(m => `
+                    <div class="calendar-month" data-month="${m.month}">
+                        <div class="month-header">
+                            <div class="month-title">${m.year}年${m.monthNum}月</div>
+                            <div class="month-count">${m.eventCount}个节点</div>
+                        </div>
+                        <div class="month-events">
+                            ${m.filteredEvents.slice(0, 3).map(e => `
+                                <div class="event-item ${getStatusClass(e.status)}" data-id="${e.id}">
+                                    <div class="event-title">${escapeHtml(e.title)}</div>
+                                    <div class="event-meta">${escapeHtml(e.category)}</div>
+                                </div>
+                            `).join('')}
+                            ${m.filteredEvents.length > 3 ? `<div class="event-more">+${m.filteredEvents.length - 3} 更多</div>` : ''}
+                            ${m.filteredEvents.length === 0 ? '<div class="event-empty">暂无节点</div>' : ''}
+                        </div>
+                    </div>
+                `).join('');
+            };
+            renderCalendar();
+            if (calendarState.currentMonth) {
+                showMonthDetail(calendarState.currentMonth);
+            }
+        } catch (e) {
+            console.error('删除失败', e);
+            alert('删除失败，请重试');
+        }
     }
 };
 
-window.setEventStatus = function(id, status) {
-    fetch(`/api/timeline/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-    }).then(resp => {
-        if (resp.ok) {
-            initCalendarPage();
-        } else {
-            alert('更新失败');
-        }
-    });
+window.setEventStatus = async function(id, status) {
+    try {
+        const resp = await fetch(`/api/timeline/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+        });
+        if (!resp.ok) throw new Error('更新失败');
+        // 重新加载数据
+        const loadResp = await fetch('/api/timeline');
+        calendarState.events = await loadResp.json();
+        // 重新渲染（简化版）
+        location.reload(); // 简单起见，直接刷新页面
+    } catch (e) {
+        console.error('更新失败', e);
+        alert('更新失败，请重试');
+    }
 };
 
 window.showEventDetail = function(id) {
-    const event = state.events.find(e => e.id === id);
+    const event = calendarState.events.find(e => e.id === id);
     if (!event) return;
 
     const modal = document.getElementById('tl-detail-modal');

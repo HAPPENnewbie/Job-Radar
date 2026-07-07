@@ -789,8 +789,31 @@ function openEvModal(ev) {
     $('event-date-precision').value = ev ? (ev.date_precision || 'month') : 'month';
     $('event-end-date').value = ev ? ev.end_date : '';
     $('event-current-action').value = ev ? ev.current_action : '';
+    $('event-opportunity-id').value = ev ? (ev.opportunity_id || '') : '';
+
+    // 填充关联机会下拉框
+    populateOpportunitySelect('event-opportunity-id', ev ? ev.opportunity_id : null);
 
     modalEv.style.display     = 'flex';
+}
+
+function populateOpportunitySelect(selectId, selectedId) {
+    const select = $(selectId);
+    if (!select) return;
+
+    // 清空现有选项（保留第一个"不关联"选项）
+    select.innerHTML = '<option value="">不关联</option>';
+
+    // 添加所有机会
+    state.opps.forEach(opp => {
+        const option = document.createElement('option');
+        option.value = opp.id;
+        option.textContent = `${opp.name} (${opp.category})`;
+        if (selectedId && opp.id === selectedId) {
+            option.selected = true;
+        }
+        select.appendChild(option);
+    });
 }
 
 async function saveEv(e) {
@@ -810,6 +833,7 @@ async function saveEv(e) {
         date_precision: $('event-date-precision').value,
         end_date: $('event-end-date').value,
         current_action: $('event-current-action').value,
+        opportunity_id: $('event-opportunity-id').value || null,
     };
     if (!data.month || !data.title) {
         alert('请填写月份和标题');
@@ -1060,6 +1084,11 @@ function openFavModal(fav) {
     $('fav-priority').value = fav ? fav.priority : '可以关注';
     $('fav-action').value = fav ? fav.current_action : '待确认';
     $('fav-note').value = fav ? fav.note : '';
+    $('fav-opportunity-id').value = fav ? (fav.opportunity_id || '') : '';
+
+    // 填充关联机会下拉框
+    populateOpportunitySelect('fav-opportunity-id', fav ? fav.opportunity_id : null);
+
     modalFav.style.display = 'flex';
 }
 
@@ -1083,6 +1112,7 @@ async function saveFav(e) {
         priority: $('fav-priority').value,
         current_action: $('fav-action').value,
         note: $('fav-note').value.trim(),
+        opportunity_id: $('fav-opportunity-id').value || null,
     };
 
     if (!data.job_name) {

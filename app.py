@@ -116,6 +116,8 @@ def migrate_timeline_fields():
             conn.execute("ALTER TABLE timeline_events ADD COLUMN end_date TEXT DEFAULT ''")
         if 'current_action' not in columns:
             conn.execute("ALTER TABLE timeline_events ADD COLUMN current_action TEXT DEFAULT ''")
+        if 'opportunity_id' not in columns:
+            conn.execute("ALTER TABLE timeline_events ADD COLUMN opportunity_id INTEGER DEFAULT NULL")
 
         # 设置现有记录的 date_precision
         conn.execute("""
@@ -126,6 +128,12 @@ def migrate_timeline_fields():
             END
             WHERE date_precision = '' OR date_precision IS NULL
         """)
+
+        # 为 job_favorites 添加 opportunity_id 字段
+        cursor = conn.execute("PRAGMA table_info(job_favorites)")
+        fav_columns = [row[1] for row in cursor.fetchall()]
+        if 'opportunity_id' not in fav_columns:
+            conn.execute("ALTER TABLE job_favorites ADD COLUMN opportunity_id INTEGER DEFAULT NULL")
 
         conn.commit()
     except Exception as e:
@@ -267,7 +275,8 @@ def row_to_event(row):
         'event_date': row['event_date'],
         'date_precision': row['date_precision'],
         'end_date': row['end_date'],
-        'current_action': row['current_action']
+        'current_action': row['current_action'],
+        'opportunity_id': row['opportunity_id']
     }
 
 
@@ -291,7 +300,8 @@ def row_to_fav(row):
         'current_action': row['current_action'],
         'note': row['note'],
         'created_at': row['created_at'],
-        'updated_at': row['updated_at']
+        'updated_at': row['updated_at'],
+        'opportunity_id': row['opportunity_id']
     }
 
 
@@ -464,10 +474,44 @@ def update_opportunity(oid):
 @app.route('/api/opportunities/<int:oid>', methods=['DELETE'])
 def delete_opportunity(oid):
     conn = get_db()
-    conn.execute("DELETE FROM opportunities WHERE id = ?", (oid,))
-    conn.commit()
-    conn.close()
-    return jsonify({'ok': True})
+    try:
+        # 先查询机会信息
+        opp = conn.execute("SELECT * FROM opportunities WHERE id = ?", (oid,)).fetchone()
+        if not opp:
+            conn.close()
+            return jsonify({'ok': False, 'error': '机会不存在'}), 404
+
+        # 获取机会的 name、category、track
+        opp_name = opp['name']
+        opp_category = opp['category']
+        opp_track = opp['track']
+
+        # 删除关联的时间节点（优先按 opportunity_id，兜底按文本匹配）
+        deleted_events = conn.execute(
+            "DELETE FROM timeline_events WHERE opportunity_id = ? OR (opportunity_id IS NULL AND category = ? AND track = ?)",
+            (oid, opp_category, opp_track)
+        ).rowcount
+
+        # 删除关联的岗位收藏（优先按 opportunity_id，兜底按文本匹配）
+        deleted_favorites = conn.execute(
+            "DELETE FROM job_favorites WHERE opportunity_id = ? OR (opportunity_id IS NULL AND opportunity_name = ?)",
+            (oid, opp_name)
+        ).rowcount
+
+        # 删除机会本身
+        conn.execute("DELETE FROM opportunities WHERE id = ?", (oid,))
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            'ok': True,
+            'deleted_opportunity': 1,
+            'deleted_events': deleted_events,
+            'deleted_favorites': deleted_favorites
+        })
+    except Exception as e:
+        conn.close()
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 
 # ============================================================
@@ -527,15 +571,16 @@ def create_event():
     cur = conn.execute("""
         INSERT INTO timeline_events
         (month, date, title, track, category, status, link, note, created_at, updated_at,
-         event_date, date_precision, end_date, current_action)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         event_date, date_precision, end_date, current_action, opportunity_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         data.get('month', ''), data.get('date', ''),
         data.get('title', ''), data.get('track', ''),
         data.get('category', ''), data.get('status', '待更新'),
         data.get('link', ''), data.get('note', ''), now, now,
         data.get('event_date', ''), data.get('date_precision', 'month'),
-        data.get('end_date', ''), data.get('current_action', '')
+        data.get('end_date', ''), data.get('current_action', ''),
+        data.get('opportunity_id')
     ))
     conn.commit()
     new_id = cur.lastrowid
@@ -550,7 +595,7 @@ def update_event(eid):
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     fields = ['month', 'date', 'title', 'track', 'category', 'status', 'link', 'note',
-              'event_date', 'date_precision', 'end_date', 'current_action']
+              'event_date', 'date_precision', 'end_date', 'current_action', 'opportunity_id']
     sets = []
     params = []
     for f in fields:
@@ -645,8 +690,8 @@ def create_job_favorite():
         (job_name, opportunity_name, track, organization, region,
          major_requirement, education_requirement, apply_time, exam_time, interview_time,
          job_url, source_url, match_status, priority, current_action, note,
-         created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         created_at, updated_at, opportunity_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         data.get('job_name', ''),
         data.get('opportunity_name', ''),
@@ -664,7 +709,8 @@ def create_job_favorite():
         data.get('priority', '可以关注'),
         data.get('current_action', '待确认'),
         data.get('note', ''),
-        now, now
+        now, now,
+        data.get('opportunity_id')
     ))
     conn.commit()
     new_id = cur.lastrowid
@@ -681,7 +727,7 @@ def update_job_favorite(fid):
     fields = [
         'job_name', 'opportunity_name', 'track', 'organization', 'region',
         'major_requirement', 'education_requirement', 'apply_time', 'exam_time', 'interview_time',
-        'job_url', 'source_url', 'match_status', 'priority', 'current_action', 'note'
+        'job_url', 'source_url', 'match_status', 'priority', 'current_action', 'note', 'opportunity_id'
     ]
     sets = []
     params = []

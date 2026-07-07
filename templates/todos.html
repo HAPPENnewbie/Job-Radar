@@ -14,35 +14,15 @@
 
 {% block extra_js %}
 <script>
-/* 待办页面逻辑 */
-document.addEventListener('DOMContentLoaded', () => {
-    initTodosPage();
-});
-
-function initTodosPage() {
-    const todoContainer = document.getElementById('todo-container');
-
-    const state = {
-        opps: [],
-        events: [],
-    };
-
-    async function loadData() {
-        try {
-            const [oppsResp, eventsResp] = await Promise.all([
-                fetch('/api/opportunities'),
-                fetch('/api/timeline')
-            ]);
-            state.opps = await oppsResp.json();
-            state.events = await eventsResp.json();
-            renderTodoView();
-        } catch (e) {
-            console.error('加载数据失败', e);
-            todoContainer.innerHTML = '<p class="placeholder">加载失败，请刷新页面</p>';
-        }
+/* 待办页面逻辑 - 使用公共 loadData() 和 renderTodoView() */
+document.addEventListener('DOMContentLoaded', async () => {
+    // 使用公共的 loadData() 加载数据
+    if (typeof loadData === 'function') {
+        await loadData();
+    } else {
+        console.error('loadData 函数未找到');
+        document.getElementById('todo-container').innerHTML = '<p class="placeholder">页面初始化失败，请刷新</p>';
     }
-
-    loadData();
-}
+});
 </script>
 {% endblock %}
