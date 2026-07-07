@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}岗位收藏 - 2027届机会看板{% endblock %}
+
+{% block page_title %}岗位收藏{% endblock %}
+{% block page_desc %}保存具体想报的岗位，不是考试大类{% endblock %}
+
+{% block content %}
+    <!-- ========== 说明 ========== -->
+    <section class="section info-section">
+        <p class="info-text">💡 这里保存的是具体岗位，例如"衡阳税务某岗位""湖南烟草衡阳市局某岗位""某银行科技岗"。</p>
+    </section>
+
+    <!-- ========== 工具栏 ========== -->
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <input type="text" id="fav-search" class="search-input" placeholder="搜索岗位名称/单位/专业/备注...">
+            <select id="fav-filter-region" class="filter-select">
+                <option value="">所有地区</option>
+                <option value="衡阳">衡阳</option>
+                <option value="湖南">湖南</option>
+                <option value="全国">全国</option>
+                <option value="其他">其他</option>
+            </select>
+            <select id="fav-filter-track" class="filter-select">
+                <option value="">所有类型</option>
+                <option value="体制/准体制">体制/准体制</option>
+                <option value="互联网/市场化">互联网/市场化</option>
+            </select>
+            <select id="fav-filter-match" class="filter-select">
+                <option value="">所有匹配状态</option>
+                <option value="可能可报">可能可报</option>
+                <option value="需要确认">需要确认</option>
+                <option value="明显不符">明显不符</option>
+                <option value="未判断">未判断</option>
+            </select>
+        </div>
+        <div class="toolbar-right">
+            <button id="btn-add-fav" class="btn btn-primary">+ 新增岗位</button>
+            <button id="btn-export-fav" class="btn btn-secondary">导出 JSON</button>
+        </div>
+    </div>
+
+    <!-- ========== 岗位列表 ========== -->
+    <section class="section">
+        <h2 class="section-title">岗位列表 <span id="fav-count" class="badge">0</span></h2>
+        <div id="fav-list" class="card-grid">
+            <p class="placeholder">暂无岗位收藏</p>
+        </div>
+    </section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* 岗位收藏页面逻辑 */
+document.addEventListener('DOMContentLoaded', () => {
+    initFavPage();
+});
+
+function initFavPage() {
+    const favList = document.getElementById('fav-list');
+    const favCount = document.getElementById('fav-count');
+    const favSearch = document.getElementById('fav-search');
+
+    const state = {
+        favorites: [],
+    };
+
+    async function loadFavorites() {
+        try {
+            const resp = await fetch('/api/job-favorites');
+            state.favorites = await resp.json();
+            renderFavorites();
+        } catch (e) {
+            console.error('加载岗位收藏失败', e);
+            favList.innerHTML = '<p class="placeholder">加载失败</p>';
+        }
+    }
+
+    function renderFavorites() {
+        const q = favSearch.value.trim().toLowerCase();
+        let favs = state.favorites;
+
+        if (q) {
+            favs = favs.filter(f =>
+                f.job_name.toLowerCase().includes(q) ||
+                f.organization.toLowerCase().includes(q) ||
+                f.major_requirement.toLowerCase().includes(q) ||
+                f.note.toLowerCase().includes(q)
+            );
+        }
+
+        const regionFilter = document.getElementById('fav-filter-region');
+        const trackFilter = document.getElementById('fav-filter-track');
+        const matchFilter = document.getElementById('fav-filter-match');
+
+        if (regionFilter.value) favs = favs.filter(f => f.region === regionFilter.value);
+        if (trackFilter.value) favs = favs.filter(f => f.track === trackFilter.value);
+        if (matchFilter.value) favs = favs.filter(f => f.match_status === matchFilter.value);
+
+        favCount.textContent = state.favorites.length;
+
+        if (favs.length === 0) {
+            favList.innerHTML = '<p class="placeholder">暂无岗位收藏</p>';
+            return;
+        }
+
+        favList.innerHTML = favs.map(f => `
+            <div class="fav-card">
+                <div class="fav-card-header">
+                    <h3 class="fav-card-title">${esc(f.job_name)}</h3>
+                    <div class="opp-card-badges">
+                        ${trackTag(f.track)}
+                        ${matchStatusTag(f.match_status)}
+                        ${priorityTag(f.priority)}
+                    </div>
+                </div>
+                <div class="fav-card-meta">
+                    <div><span class="meta-key">所属机会：</span>${esc(f.opportunity_name)}</div>
+                    <div><span class="meta-key">单位：</span>${esc(f.organization)}</div>
+                    <div><span class="meta-key">地区：</span>${esc(f.region)}</div>
+                    <div><span class="meta-key">专业要求：</span>${esc(f.major_requirement)}</div>
+                    <div><span class="meta-key">学历要求：</span>${esc(f.education_requirement)}</div>
+                    <div><span class="meta-key">当前动作：</span>${actionTag(f.current_action)}</div>
+                </div>
+                <div class="fav-card-links">
+                    ${linkHtml(f.job_url, '岗位链接')}
+                    ${linkHtml(f.source_url, '公告链接')}
+                </div>
+                ${f.note ? `<div class="fav-card-note">${esc(f.note)}</div>` : ''}
+                <div class="fav-card-actions">
+                    <button class="btn btn-sm btn-secondary" onclick="editFav(${f.id})">编辑</button>
+                    <button class="btn btn-sm btn-danger" onclick="delFav(${f.id})">删除</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    /* 搜索和筛选 */
+    let favTimer;
+    favSearch.addEventListener('input', () => {
+        clearTimeout(favTimer);
+        favTimer = setTimeout(() => renderFavorites(), 200);
+    });
+    ['fav-filter-region', 'fav-filter-track', 'fav-filter-match'].forEach(id => {
+        document.getElementById(id).addEventListener('change', () => renderFavorites());
+    });
+
+    /* 新增 */
+    document.getElementById('btn-add-fav').addEventListener('click', () => openFavModal(null));
+
+    /* 导出 */
+    document.getElementById('btn-export-fav').addEventListener('click', () => {
+        const data = {
+            job_favorites: state.favorites,
+            exported_at: new Date().toISOString().slice(0, 19).replace('T', ' ')
+        };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `job-favorites-${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    /* 初始加载 */
+    loadFavorites();
+
+    /* 暴露全局函数 */
+    window.editFav = function(id) {
+        const fav = state.favorites.find(f => f.id === id);
+        if (fav) openFavModal(fav);
+    };
+
+    window.delFav = function(id) {
+        const fav = state.favorites.find(f => f.id === id);
+        if (!fav) return;
+        showConfirm(`确认删除岗位「${fav.job_name}」？`, async () => {
+            try {
+                await fetch(`/api/job-favorites/${id}`, { method: 'DELETE' });
+                await loadFavorites();
+            } catch (err) {
+                console.error(err);
+                alert('删除失败');
+            }
+        });
+    };
+}
+</script>
+{% endblock %}

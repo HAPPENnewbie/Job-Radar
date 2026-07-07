@@ -1,0 +1,486 @@
+{% extends "base.html" %}
+
+{% block title %}日历管理 - 2027届机会看板{% endblock %}
+
+{% block page_title %}日历管理{% endblock %}
+{% block page_desc %}按月份查看公告、报名、笔试、面试节点{% endblock %}
+
+{% block content %}
+    <!-- ========== 工具栏 ========== -->
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <p style="font-size:0.85rem;color:var(--c-text-3);margin:0;">点击月份查看该月详情，点击节点可编辑或删除。</p>
+        </div>
+        <div class="toolbar-right">
+            <button id="btn-add-event" class="btn btn-primary">+ 新增节点</button>
+        </div>
+    </div>
+
+    <!-- ========== 筛选工具栏 ========== -->
+    <div class="toolbar" style="margin-top: 12px;">
+        <div class="toolbar-left">
+            <select id="filter-track" class="filter-select">
+                <option value="">所有类型</option>
+                <option value="体制/准体制">体制/准体制</option>
+                <option value="互联网/市场化">互联网/市场化</option>
+            </select>
+            <select id="filter-status" class="filter-select">
+                <option value="">所有状态</option>
+                <option value="官方已确定">官方已确定</option>
+                <option value="待更新">待更新</option>
+                <option value="参考往年">参考往年</option>
+            </select>
+            <button id="btn-clear-filter" class="btn btn-secondary btn-sm">清空筛选</button>
+        </div>
+    </div>
+
+    <!-- ========== 日历网格 ========== -->
+    <section class="section">
+        <h2 class="section-title">2026-2027 年度日历</h2>
+        <div id="calendar-grid" class="calendar-grid">
+            <p class="placeholder">加载中...</p>
+        </div>
+    </section>
+
+    <!-- ========== 月份详情（点击月份后显示） ========== -->
+    <section id="month-detail-section" class="section" style="display: none;">
+        <div class="detail-header">
+            <h2 class="section-title" id="month-detail-title">月份详情</h2>
+            <button id="btn-close-detail" class="btn btn-secondary btn-sm">返回日历</button>
+        </div>
+        <div id="month-detail-content">
+            <!-- 节点将在这里显示 -->
+        </div>
+    </section>
+
+    <!-- ========== 节点列表（辅助查看） ========== -->
+    <section class="section">
+        <div class="detail-list-header">
+            <h3 class="section-title">所有节点列表</h3>
+            <input type="text" id="detail-search" class="detail-search" placeholder="搜索节点标题/类别...">
+        </div>
+        <div id="event-list" class="event-list">
+            <p class="placeholder">加载中...</p>
+        </div>
+    </section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* 全局状态变量，供全局函数访问 */
+const state = {
+    events: [],
+    currentMonth: null,
+    filterTrack: '',
+    filterStatus: ''
+};
+
+/* 日历管理页面逻辑 */
+document.addEventListener('DOMContentLoaded', () => {
+    initCalendarPage();
+});
+
+function initCalendarPage() {
+    /* 加载数据 */
+    async function loadEvents() {
+        try {
+            const resp = await fetch('/api/timeline');
+            state.events = await resp.json();
+            renderCalendar();
+            renderEventList();
+        } catch (e) {
+            console.error('加载时间线失败', e);
+        }
+    }
+
+    /* 渲染日历网格 */
+    function renderCalendar() {
+        const grid = document.getElementById('calendar-grid');
+        if (!grid) return;
+
+        // 生成 2026-07 到 2027-12 的所有月份
+        const months = [];
+        for (let year = 2026; year <= 2027; year++) {
+            const startMonth = year === 2026 ? 7 : 1;
+            const endMonth = 12;
+            for (let month = startMonth; month <= endMonth; month++) {
+                const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+                const monthEvents = state.events.filter(e => e.month === monthStr);
+
+                // 应用筛选
+                let filteredEvents = monthEvents;
+                if (state.filterTrack) {
+                    filteredEvents = filteredEvents.filter(e => e.track === state.filterTrack);
+                }
+                if (state.filterStatus) {
+                    filteredEvents = filteredEvents.filter(e => e.status === state.filterStatus);
+                }
+
+                months.push({
+                    month: monthStr,
+                    year: year,
+                    monthNum: month,
+                    events: monthEvents,
+                    filteredEvents: filteredEvents,
+                    eventCount: filteredEvents.length
+                });
+            }
+        }
+
+        grid.innerHTML = months.map(m => `
+            <div class="calendar-month" data-month="${m.month}">
+                <div class="month-header">
+                    <div class="month-title">${m.year}年${m.monthNum}月</div>
+                    <div class="month-count">${m.eventCount}个节点</div>
+                </div>
+                <div class="month-events">
+                    ${m.filteredEvents.slice(0, 3).map(e => `
+                        <div class="event-item ${getStatusClass(e.status)}" data-id="${e.id}">
+                            <div class="event-title">${escapeHtml(e.title)}</div>
+                            <div class="event-meta">${escapeHtml(e.category)}</div>
+                        </div>
+                    `).join('')}
+                    ${m.filteredEvents.length > 3 ? `<div class="event-more">+${m.filteredEvents.length - 3} 更多</div>` : ''}
+                    ${m.filteredEvents.length === 0 ? '<div class="event-empty">暂无节点</div>' : ''}
+                </div>
+            </div>
+        `).join('');
+
+        // 绑定月份点击事件
+        grid.querySelectorAll('.calendar-month').forEach(el => {
+            el.addEventListener('click', () => {
+                const month = el.dataset.month;
+                showMonthDetail(month);
+            });
+        });
+
+        // 绑定节点点击事件
+        grid.querySelectorAll('.event-item').forEach(el => {
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const eventId = parseInt(el.dataset.id);
+                showEventDetail(eventId);
+            });
+        });
+    }
+
+    /* 显示月份详情 */
+    function showMonthDetail(month) {
+        state.currentMonth = month;
+        const section = document.getElementById('month-detail-section');
+        const title = document.getElementById('month-detail-title');
+        const content = document.getElementById('month-detail-content');
+
+        const [year, monthNum] = month.split('-').map(Number);
+        title.textContent = `${year}年${monthNum}月节点`;
+
+        // 筛选该月的节点
+        let monthEvents = state.events.filter(e => e.month === month);
+        if (state.filterTrack) {
+            monthEvents = monthEvents.filter(e => e.track === state.filterTrack);
+        }
+        if (state.filterStatus) {
+            monthEvents = monthEvents.filter(e => e.status === state.filterStatus);
+        }
+
+        // 按日期排序（有具体日期的排前面）
+        monthEvents.sort((a, b) => {
+            if (a.event_date && !b.event_date) return -1;
+            if (!a.event_date && b.event_date) return 1;
+            if (a.event_date && b.event_date) return a.event_date.localeCompare(b.event_date);
+            return 0;
+        });
+
+        if (monthEvents.length === 0) {
+            content.innerHTML = '<p class="placeholder">该月暂无节点</p>';
+        } else {
+            content.innerHTML = `
+                <div class="month-events-detail">
+                    ${monthEvents.map(e => `
+                        <div class="event-card ${getStatusClass(e.status)}" data-id="${e.id}">
+                            <div class="event-card-header">
+                                <div class="event-card-title">${escapeHtml(e.title)}</div>
+                                <div class="event-card-badges">
+                                    <span class="badge ${getStatusBadgeClass(e.status)}">${escapeHtml(e.status)}</span>
+                                    <span class="badge ${getTrackBadgeClass(e.track)}">${escapeHtml(e.track)}</span>
+                                </div>
+                            </div>
+                            <div class="event-card-meta">
+                                <span>类别: ${escapeHtml(e.category)}</span>
+                                ${e.event_date ? `<span>日期: ${escapeHtml(e.event_date)}</span>` : ''}
+                                ${e.current_action ? `<span>动作: ${escapeHtml(e.current_action)}</span>` : ''}
+                            </div>
+                            ${e.note ? `<div class="event-card-note">${escapeHtml(e.note)}</div>` : ''}
+                            ${e.link ? `<div class="event-card-link"><a href="${escapeHtml(e.link)}" target="_blank">查看链接</a></div>` : ''}
+                            <div class="event-card-actions">
+                                <button class="btn btn-sm btn-secondary" onclick="editEvent(${e.id})">编辑</button>
+                                <button class="btn btn-sm btn-success" onclick="setEventStatus(${e.id}, '官方已确定')">标记已确定</button>
+                                <button class="btn btn-sm btn-warning" onclick="setEventStatus(${e.id}, '待更新')">标记待更新</button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteEvent(${e.id})">删除</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+
+            // 绑定节点点击事件
+            content.querySelectorAll('.event-card').forEach(el => {
+                el.addEventListener('click', (e) => {
+                    if (e.target.tagName === 'BUTTON' || e.target.tagName === 'A') return;
+                    const eventId = parseInt(el.dataset.id);
+                    showEventDetail(eventId);
+                });
+            });
+        }
+
+        section.style.display = 'block';
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    /* 隐藏月份详情 */
+    document.getElementById('btn-close-detail').addEventListener('click', () => {
+        document.getElementById('month-detail-section').style.display = 'none';
+        state.currentMonth = null;
+    });
+
+    /* 渲染节点列表 */
+    function renderEventList() {
+        const list = document.getElementById('event-list');
+        const search = document.getElementById('detail-search');
+        const query = search.value.toLowerCase();
+
+        let filteredEvents = state.events;
+        if (query) {
+            filteredEvents = filteredEvents.filter(e =>
+                e.title.toLowerCase().includes(query) ||
+                e.category.toLowerCase().includes(query) ||
+                (e.note && e.note.toLowerCase().includes(query))
+            );
+        }
+
+        // 应用筛选
+        if (state.filterTrack) {
+            filteredEvents = filteredEvents.filter(e => e.track === state.filterTrack);
+        }
+        if (state.filterStatus) {
+            filteredEvents = filteredEvents.filter(e => e.status === state.filterStatus);
+        }
+
+        // 按月份排序
+        filteredEvents.sort((a, b) => {
+            if (a.month !== b.month) return a.month.localeCompare(b.month);
+            if (a.event_date && !b.event_date) return -1;
+            if (!a.event_date && b.event_date) return 1;
+            if (a.event_date && b.event_date) return a.event_date.localeCompare(b.event_date);
+            return 0;
+        });
+
+        if (filteredEvents.length === 0) {
+            list.innerHTML = '<p class="placeholder">暂无节点</p>';
+        } else {
+            list.innerHTML = filteredEvents.map(e => `
+                <div class="event-list-item ${getStatusClass(e.status)}" data-id="${e.id}">
+                    <div class="event-list-month">${escapeHtml(e.month)}</div>
+                    <div class="event-list-content">
+                        <div class="event-list-title">${escapeHtml(e.title)}</div>
+                        <div class="event-list-meta">
+                            ${escapeHtml(e.category)} | ${escapeHtml(e.track)} | ${escapeHtml(e.status)}
+                            ${e.event_date ? ` | ${escapeHtml(e.event_date)}` : ''}
+                        </div>
+                    </div>
+                    <div class="event-list-actions">
+                        <button class="btn btn-sm btn-secondary" onclick="editEvent(${e.id})">编辑</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteEvent(${e.id})">删除</button>
+                    </div>
+                </div>
+            `).join('');
+
+            // 绑定节点点击事件
+            list.querySelectorAll('.event-list-item').forEach(el => {
+                el.addEventListener('click', (e) => {
+                    if (e.target.tagName === 'BUTTON') return;
+                    const eventId = parseInt(el.dataset.id);
+                    showEventDetail(eventId);
+                });
+            });
+        }
+    }
+
+    /* 搜索 */
+    document.getElementById('detail-search').addEventListener('input', () => {
+        renderEventList();
+    });
+
+    /* 筛选 */
+    document.getElementById('filter-track').addEventListener('change', (e) => {
+        state.filterTrack = e.target.value;
+        renderCalendar();
+        if (state.currentMonth) {
+            showMonthDetail(state.currentMonth);
+        }
+        renderEventList();
+    });
+
+    document.getElementById('filter-status').addEventListener('change', (e) => {
+        state.filterStatus = e.target.value;
+        renderCalendar();
+        if (state.currentMonth) {
+            showMonthDetail(state.currentMonth);
+        }
+        renderEventList();
+    });
+
+    document.getElementById('btn-clear-filter').addEventListener('click', () => {
+        state.filterTrack = '';
+        state.filterStatus = '';
+        document.getElementById('filter-track').value = '';
+        document.getElementById('filter-status').value = '';
+        renderCalendar();
+        if (state.currentMonth) {
+            showMonthDetail(state.currentMonth);
+        }
+        renderEventList();
+    });
+
+    /* 新增按钮 */
+    document.getElementById('btn-add-event').addEventListener('click', () => {
+        openEvModal(null);
+    });
+
+    /* 初始加载 */
+    loadEvents();
+}
+
+/* 辅助函数 */
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function getStatusClass(status) {
+    const classMap = {
+        '官方已确定': 'status-confirmed',
+        '待更新': 'status-pending',
+        '参考往年': 'status-reference',
+        '已放弃': 'status-abandoned'
+    };
+    return classMap[status] || '';
+}
+
+function getStatusBadgeClass(status) {
+    const classMap = {
+        '官方已确定': 'badge-success',
+        '待更新': 'badge-warning',
+        '参考往年': 'badge-info',
+        '已放弃': 'badge-secondary'
+    };
+    return classMap[status] || 'badge-secondary';
+}
+
+function getTrackBadgeClass(track) {
+    if (track.includes('体制')) return 'badge-primary';
+    if (track.includes('互联网')) return 'badge-info';
+    return 'badge-secondary';
+}
+
+/* 暴露全局函数供 onclick 使用 */
+window.editEvent = function(id) {
+    const event = state.events.find(e => e.id === id);
+    if (event) {
+        openEvModal(event);
+    }
+};
+
+window.deleteEvent = function(id) {
+    const event = state.events.find(e => e.id === id);
+    if (!event) return;
+    if (confirm(`确认删除节点「${event.title}」？`)) {
+        fetch(`/api/timeline/${id}`, { method: 'DELETE' })
+            .then(resp => {
+                if (resp.ok) {
+                    initCalendarPage();
+                } else {
+                    alert('删除失败');
+                }
+            });
+    }
+};
+
+window.setEventStatus = function(id, status) {
+    fetch(`/api/timeline/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+    }).then(resp => {
+        if (resp.ok) {
+            initCalendarPage();
+        } else {
+            alert('更新失败');
+        }
+    });
+};
+
+window.showEventDetail = function(id) {
+    const event = state.events.find(e => e.id === id);
+    if (!event) return;
+
+    const modal = document.getElementById('tl-detail-modal');
+    const title = document.getElementById('tl-detail-title');
+    const body = document.getElementById('tl-detail-body');
+
+    title.textContent = event.title;
+    body.innerHTML = `
+        <div class="detail-field">
+            <div class="detail-label">月份</div>
+            <div class="detail-value">${escapeHtml(event.month)}</div>
+        </div>
+        ${event.event_date ? `
+            <div class="detail-field">
+                <div class="detail-label">具体日期</div>
+                <div class="detail-value">${escapeHtml(event.event_date)}</div>
+            </div>
+        ` : ''}
+        <div class="detail-field">
+            <div class="detail-label">类别</div>
+            <div class="detail-value">${escapeHtml(event.category)}</div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-label">类型</div>
+            <div class="detail-value">${escapeHtml(event.track)}</div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-label">状态</div>
+            <div class="detail-value">${escapeHtml(event.status)}</div>
+        </div>
+        ${event.current_action ? `
+            <div class="detail-field">
+                <div class="detail-label">当前动作</div>
+                <div class="detail-value">${escapeHtml(event.current_action)}</div>
+            </div>
+        ` : ''}
+        ${event.link ? `
+            <div class="detail-field">
+                <div class="detail-label">链接</div>
+                <div class="detail-value"><a href="${escapeHtml(event.link)}" target="_blank">查看</a></div>
+            </div>
+        ` : ''}
+        ${event.note ? `
+            <div class="detail-field">
+                <div class="detail-label">备注</div>
+                <div class="detail-value">${escapeHtml(event.note)}</div>
+            </div>
+        ` : ''}
+        <div class="detail-actions">
+            <button class="btn btn-secondary" onclick="editEvent(${event.id})">编辑</button>
+            <button class="btn btn-success" onclick="setEventStatus(${event.id}, '官方已确定'); document.getElementById('tl-detail-modal').style.display='none'">标记已确定</button>
+            <button class="btn btn-warning" onclick="setEventStatus(${event.id}, '待更新'); document.getElementById('tl-detail-modal').style.display='none'">标记待更新</button>
+            <button class="btn btn-danger" onclick="deleteEvent(${event.id}); document.getElementById('tl-detail-modal').style.display='none'">删除</button>
+        </div>
+    `;
+
+    modal.style.display = 'flex';
+};
+</script>
+{% endblock %}

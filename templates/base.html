@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}2027届机会看板{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="app-layout">
+
+    <!-- ========== 侧边栏导航 ========== -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h2>机会看板</h2>
+            <button class="sidebar-toggle" id="sidebar-toggle">☰</button>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="/" class="nav-item {% if active_page == 'home' %}active{% endif %}">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-text">首页总览</span>
+            </a>
+            <a href="/opportunities" class="nav-item {% if active_page == 'opportunities' %}active{% endif %}">
+                <span class="nav-icon">📋</span>
+                <span class="nav-text">机会管理</span>
+            </a>
+            <a href="/job-favorites" class="nav-item {% if active_page == 'favorites' %}active{% endif %}">
+                <span class="nav-icon">⭐</span>
+                <span class="nav-text">岗位收藏</span>
+            </a>
+            <a href="/timeline" class="nav-item {% if active_page == 'timeline' %}active{% endif %}">
+                <span class="nav-icon">📅</span>
+                <span class="nav-text">时间线</span>
+            </a>
+            <a href="/todos" class="nav-item {% if active_page == 'todos' %}active{% endif %}">
+                <span class="nav-icon">✅</span>
+                <span class="nav-text">待办事项</span>
+            </a>
+            <a href="/data" class="nav-item {% if active_page == 'data' %}active{% endif %}">
+                <span class="nav-icon">💾</span>
+                <span class="nav-text">数据管理</span>
+            </a>
+            <a href="/settings" class="nav-item {% if active_page == 'settings' %}active{% endif %}">
+                <span class="nav-icon">⚙️</span>
+                <span class="nav-text">设置</span>
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="footer-text">2027届</div>
+            <div class="footer-text">计算机硕士</div>
+        </div>
+    </aside>
+
+    <!-- ========== 主内容区 ========== -->
+    <main class="main-content">
+        <div class="page-header">
+            <h1>{% block page_title %}页面标题{% endblock %}</h1>
+            <p class="page-desc">{% block page_desc %}页面说明{% endblock %}</p>
+        </div>
+        <div class="page-content">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+</div>
+
+<!-- ========== 公共弹窗容器 ========== -->
+<div id="confirm-dialog" class="modal" style="display:none;">
+    <div class="modal-content modal-small">
+        <p id="confirm-msg" class="confirm-msg"></p>
+        <div class="form-actions">
+            <button id="confirm-yes" class="btn btn-danger">确认</button>
+            <button id="confirm-no" class="btn btn-secondary">取消</button>
+        </div>
+    </div>
+</div>
+
+<!-- ========== 机会表单弹窗 ========== -->
+<div id="modal-opp" class="modal" style="display:none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modal-opp-title">新增机会</h3>
+            <button class="modal-close" data-close="modal-opp">&times;</button>
+        </div>
+        <form id="form-opp" class="modal-body">
+            <input type="hidden" id="opp-id">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>机会名称 <span class="required">*</span></label>
+                    <input type="text" id="opp-name" required>
+                </div>
+                <div class="form-group">
+                    <label>机会大类 <span class="required">*</span></label>
+                    <select id="opp-track" required>
+                        <option value="体制/准体制">体制 / 准体制</option>
+                        <option value="互联网/市场化">互联网 / 市场化</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>具体类别 <span class="required">*</span></label>
+                    <input type="text" id="opp-category" required placeholder="如：国考、互联网大厂">
+                </div>
+                <div class="form-group">
+                    <label>关注优先级</label>
+                    <select id="opp-priority">
+                        <option value="重点关注">重点关注</option>
+                        <option value="可以关注">可以关注</option>
+                        <option value="低频关注">低频关注</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>地域</label>
+                    <select id="opp-region">
+                        <option value="衡阳">衡阳</option>
+                        <option value="湖南">湖南</option>
+                        <option value="全国">全国</option>
+                        <option value="远程">远程</option>
+                        <option value="其他">其他</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>是否适合计算机硕士</label>
+                    <select id="opp-fit">
+                        <option value="是">是</option>
+                        <option value="否">否</option>
+                        <option value="待确认">待确认</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>往年公告/启动时间</label>
+                    <input type="text" id="opp-ann-time" placeholder="如：10月">
+                </div>
+                <div class="form-group">
+                    <label>往年报名/投递时间</label>
+                    <input type="text" id="opp-app-time" placeholder="如：10月">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>笔试/测评时间</label>
+                    <input type="text" id="opp-exam-time" placeholder="如：11-12月">
+                </div>
+                <div class="form-group">
+                    <label>面试/后续时间</label>
+                    <input type="text" id="opp-int-time" placeholder="如：次年2-5月">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>官网链接</label>
+                    <input type="url" id="opp-url" placeholder="https://...">
+                </div>
+                <div class="form-group">
+                    <label>公告链接</label>
+                    <input type="url" id="opp-ann-url" placeholder="https://...">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>岗位表链接</label>
+                    <input type="url" id="opp-pos-url" placeholder="https://...">
+                </div>
+                <div class="form-group">
+                    <label>报名/投递入口</label>
+                    <input type="url" id="opp-apply-url" placeholder="https://...">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>状态</label>
+                    <select id="opp-status">
+                        <option value="参考往年">参考往年</option>
+                        <option value="官方已确定">官方已确定</option>
+                        <option value="待更新">待更新</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>当前动作</label>
+                    <select id="opp-action">
+                        <option value="持续关注">持续关注</option>
+                        <option value="等公告">等公告</option>
+                        <option value="等报名">等报名</option>
+                        <option value="待投递">待投递</option>
+                        <option value="已投递">已投递</option>
+                        <option value="待笔试">待笔试</option>
+                        <option value="待面试">待面试</option>
+                        <option value="已结束">已结束</option>
+                        <option value="已放弃">已放弃</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>备注</label>
+                <textarea id="opp-note" rows="3"></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">保存</button>
+                <button type="button" class="btn btn-secondary" data-close="modal-opp">取消</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ========== 时间节点表单弹窗 ========== -->
+<div id="modal-event" class="modal" style="display:none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modal-event-title">新增时间节点</h3>
+            <button class="modal-close" data-close="modal-event">&times;</button>
+        </div>
+        <form id="form-event" class="modal-body">
+            <input type="hidden" id="event-id">
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>月份 <span class="required">*</span></label>
+                    <input type="month" id="event-month" required>
+                </div>
+                <div class="form-group">
+                    <label>具体日期（可选）</label>
+                    <input type="date" id="event-date">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>日期精度</label>
+                    <select id="event-date-precision">
+                        <option value="month">仅月份</option>
+                        <option value="day">精确到日</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>结束日期（可选）</label>
+                    <input type="date" id="event-end-date">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>节点标题 <span class="required">*</span></label>
+                    <input type="text" id="event-title" required placeholder="如：国考公告预计发布">
+                </div>
+                <div class="form-group">
+                    <label>所属类别</label>
+                    <input type="text" id="event-category" placeholder="如：国考">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>机会大类</label>
+                    <select id="event-track">
+                        <option value="体制/准体制">体制 / 准体制</option>
+                        <option value="互联网/市场化">互联网 / 市场化</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>状态</label>
+                    <select id="event-status">
+                        <option value="参考往年">参考往年</option>
+                        <option value="官方已确定">官方已确定</option>
+                        <option value="待更新">待更新</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>当前动作</label>
+                <select id="event-current-action">
+                    <option value="">请选择</option>
+                    <option value="等公告">等公告</option>
+                    <option value="等报名">等报名</option>
+                    <option value="待投递">待投递</option>
+                    <option value="已投递">已投递</option>
+                    <option value="待笔试">待笔试</option>
+                    <option value="待面试">待面试</option>
+                    <option value="已结束">已结束</option>
+                    <option value="已放弃">已放弃</option>
+                    <option value="持续关注">持续关注</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>相关链接</label>
+                <input type="url" id="event-link" placeholder="https://...">
+            </div>
+
+            <div class="form-group">
+                <label>备注</label>
+                <textarea id="event-note" rows="3"></textarea>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">保存</button>
+                <button type="button" class="btn btn-secondary" data-close="modal-event">取消</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ========== 岗位收藏表单弹窗 ========== -->
+<div id="modal-fav" class="modal" style="display:none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modal-fav-title">新增岗位收藏</h3>
+            <button class="modal-close" data-close="modal-fav">&times;</button>
+        </div>
+        <form id="form-fav" class="modal-body">
+            <input type="hidden" id="fav-id">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>岗位名称 <span class="required">*</span></label>
+                    <input type="text" id="fav-job-name" required>
+                </div>
+                <div class="form-group">
+                    <label>所属机会</label>
+                    <input type="text" id="fav-opp-name" placeholder="如：国考、互联网大厂秋招">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>机会大类</label>
+                    <select id="fav-track">
+                        <option value="体制/准体制">体制 / 准体制</option>
+                        <option value="互联网/市场化">互联网 / 市场化</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>单位名称</label>
+                    <input type="text" id="fav-organization">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>地区</label>
+                    <select id="fav-region">
+                        <option value="衡阳">衡阳</option>
+                        <option value="湖南">湖南</option>
+                        <option value="全国">全国</option>
+                        <option value="远程">远程</option>
+                        <option value="其他">其他</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>专业要求</label>
+                    <input type="text" id="fav-major">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>学历要求</label>
+                    <input type="text" id="fav-education">
+                </div>
+                <div class="form-group">
+                    <label>报名/投递时间</label>
+                    <input type="text" id="fav-apply-time" placeholder="如：2026-10">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>笔试/测评时间</label>
+                    <input type="text" id="fav-exam-time" placeholder="如：2026-11">
+                </div>
+                <div class="form-group">
+                    <label>面试时间</label>
+                    <input type="text" id="fav-interview-time" placeholder="如：2027-03">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>岗位链接</label>
+                    <input type="url" id="fav-job-url" placeholder="https://...">
+                </div>
+                <div class="form-group">
+                    <label>公告/官网链接</label>
+                    <input type="url" id="fav-source-url" placeholder="https://...">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>匹配状态</label>
+                    <select id="fav-match-status">
+                        <option value="未判断">未判断</option>
+                        <option value="可能可报">可能可报</option>
+                        <option value="需要确认">需要确认</option>
+                        <option value="明显不符">明显不符</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>关注优先级</label>
+                    <select id="fav-priority">
+                        <option value="重点关注">重点关注</option>
+                        <option value="可以关注">可以关注</option>
+                        <option value="低频关注">低频关注</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>当前动作</label>
+                <select id="fav-action">
+                    <option value="待确认">待确认</option>
+                    <option value="待报名">待报名</option>
+                    <option value="待投递">待投递</option>
+                    <option value="待笔试">待笔试</option>
+                    <option value="待面试">待面试</option>
+                    <option value="已放弃">已放弃</option>
+                    <option value="已结束">已结束</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>备注</label>
+                <textarea id="fav-note" rows="3"></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">保存</button>
+                <button type="button" class="btn btn-secondary" data-close="modal-fav">取消</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ========== 时间线节点详情弹窗 ========== -->
+<div id="tl-detail-modal" class="modal" style="display:none;">
+    <div class="modal-content modal-small">
+        <div class="modal-header">
+            <h3 id="tl-detail-title">节点详情</h3>
+            <button class="modal-close" data-close="tl-detail-modal">&times;</button>
+        </div>
+        <div id="tl-detail-body" class="detail-modal-body"></div>
+    </div>
+</div>
+
+<!-- ========== 时间线悬停提示 ========== -->
+<div id="tl-tooltip" class="tl-tooltip"></div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

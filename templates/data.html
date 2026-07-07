@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}数据管理 - 2027届机会看板{% endblock %}
+
+{% block page_title %}数据管理{% endblock %}
+{% block page_desc %}备份、恢复和重置数据{% endblock %}
+
+{% block content %}
+    <!-- ========== 数据库信息 ========== -->
+    <section class="section">
+        <h2 class="section-title">数据库信息</h2>
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="info-label">机会总数</div>
+                <div class="info-value" id="db-opp-count">-</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">时间节点</div>
+                <div class="info-value" id="db-event-count">-</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">岗位收藏</div>
+                <div class="info-value" id="db-fav-count">-</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== 数据操作 ========== -->
+    <section class="section">
+        <h2 class="section-title">数据操作</h2>
+        <div class="data-actions">
+            <div class="data-action-item">
+                <h3>导出全部 JSON</h3>
+                <p>导出所有机会、时间节点、岗位收藏数据为 JSON 文件。</p>
+                <button id="btn-export" class="btn btn-primary">导出 JSON</button>
+            </div>
+            <div class="data-action-item">
+                <h3>导入 JSON</h3>
+                <p>从 JSON 文件恢复数据，将覆盖当前数据。</p>
+                <label class="btn btn-secondary btn-file-label">
+                    选择文件并导入
+                    <input type="file" id="file-import" accept=".json" hidden>
+                </label>
+            </div>
+            <div class="data-action-item">
+                <h3>重置默认数据</h3>
+                <p>清空当前数据，从 seed/default_data.json 重新初始化。</p>
+                <button id="btn-reset" class="btn btn-danger">重置数据</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== 提醒 ========== -->
+    <section class="section">
+        <h2 class="section-title">注意事项</h2>
+        <div class="warning-list">
+            <div class="warning-item">
+                <strong>⚠️ data/app.db 不建议提交到 GitHub</strong>
+                <p>数据库包含个人求职数据，已通过 .gitignore 忽略。请使用导出功能备份。</p>
+            </div>
+            <div class="warning-item">
+                <strong>⚠️ 导入和重置前请先备份</strong>
+                <p>导入会覆盖当前数据，重置会清空所有数据。操作前请先导出 JSON 备份。</p>
+            </div>
+            <div class="warning-item">
+                <strong>ℹ️ 所有考试招聘信息以官网公告为准</strong>
+                <p>本工具中的时间信息参考往年节奏，仅供参考，不作为官方依据。</p>
+            </div>
+        </div>
+    </section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* 数据管理页面逻辑 */
+document.addEventListener('DOMContentLoaded', () => {
+    initDataPage();
+});
+
+function initDataPage() {
+    const fileInput = document.getElementById('file-import');
+
+    /* 加载数据库信息 */
+    async function loadDbInfo() {
+        try {
+            const [oppsResp, eventsResp, favsResp] = await Promise.all([
+                fetch('/api/opportunities'),
+                fetch('/api/timeline'),
+                fetch('/api/job-favorites')
+            ]);
+            const opps = await oppsResp.json();
+            const events = await eventsResp.json();
+            const favs = await favsResp.json();
+            document.getElementById('db-opp-count').textContent = opps.length;
+            document.getElementById('db-event-count').textContent = events.length;
+            document.getElementById('db-fav-count').textContent = favs.length;
+        } catch (e) {
+            console.error('加载数据库信息失败', e);
+        }
+    }
+
+    /* 导出 */
+    document.getElementById('btn-export').addEventListener('click', async () => {
+        try {
+            const resp = await fetch('/api/export');
+            const data = await resp.json();
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `opp-backup-${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error(err);
+            alert('导出失败');
+        }
+    });
+
+    /* 导入 */
+    fileInput.addEventListener('change', async () => {
+        const file = fileInput.files[0];
+        if (!file) return;
+        showConfirm('导入将覆盖当前所有数据，确认继续？', async () => {
+            try {
+                const form = new FormData();
+                form.append('file', file);
+                form.append('overwrite', 'true');
+                const resp = await fetch('/api/import', { method: 'POST', body: form });
+                const result = await resp.json();
+                if (!resp.ok) {
+                    alert(result.error || '导入失败');
+                    return;
+                }
+                alert(`导入成功：${result.opp_count} 条机会，${result.event_count} 条时间节点，${result.fav_count} 条岗位收藏`);
+                await loadDbInfo();
+            } catch (err) {
+                console.error(err);
+                alert('导入失败');
+            }
+            fileInput.value = '';
+        });
+    });
+
+    /* 重置 */
+    document.getElementById('btn-reset').addEventListener('click', () => {
+        showConfirm('确认重置为默认数据？当前数据将被全部清除。', async () => {
+            try {
+                const resp = await fetch('/api/reset', { method: 'POST' });
+                const result = await resp.json();
+                if (!resp.ok) {
+                    alert(result.error || '重置失败');
+                    return;
+                }
+                alert('已重置为默认数据');
+                await loadDbInfo();
+            } catch (err) {
+                console.error(err);
+                alert('重置失败');
+            }
+        });
+    });
+
+    loadDbInfo();
+}
+</script>
+{% endblock %}

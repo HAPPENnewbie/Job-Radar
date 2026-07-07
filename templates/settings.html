@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}设置 - 2027届机会看板{% endblock %}
+
+{% block page_title %}设置{% endblock %}
+{% block page_desc %}配置个人信息和偏好设置{% endblock %}
+
+{% block content %}
+    <!-- ========== 个人背景 ========== -->
+    <section class="section">
+        <h2 class="section-title">我的基本背景</h2>
+        <div class="settings-content">
+            <div class="setting-item">
+                <div class="setting-label">学校</div>
+                <div class="setting-value">xx大学</div>
+            </div>
+            <div class="setting-item">
+                <div class="setting-label">学历</div>
+                <div class="setting-value">2027届硕士研究生</div>
+            </div>
+            <div class="setting-item">
+                <div class="setting-label">专业</div>
+                <div class="setting-value">计算机技术 / 计算机类</div>
+            </div>
+            <div class="setting-item">
+                <div class="setting-label">本科</div>
+                <div class="setting-value">计算机科学与技术</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== 地域目标 ========== -->
+    <section class="section">
+        <h2 class="section-title">地域目标</h2>
+        <div class="settings-content">
+            <div class="setting-item">
+                <div class="setting-label">第一优先</div>
+                <div class="setting-value">衡阳</div>
+            </div>
+            <div class="setting-item">
+                <div class="setting-label">第二优先</div>
+                <div class="setting-value">湖南省内</div>
+            </div>
+            <div class="setting-item">
+                <div class="setting-label">第三优先</div>
+                <div class="setting-value">全国稳定机会</div>
+            </div>
+            <div class="setting-item">
+                <div class="setting-label">备选路线</div>
+                <div class="setting-value">互联网 / 市场化就业</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== 时间线范围 ========== -->
+    <section class="section">
+        <h2 class="section-title">时间线范围</h2>
+        <div class="settings-content">
+            <div class="setting-item">
+                <div class="setting-label">起始时间</div>
+                <div class="setting-value">2026年7月</div>
+            </div>
+            <div class="setting-item">
+                <div class="setting-label">结束时间</div>
+                <div class="setting-value">2027年12月</div>
+            </div>
+            <div class="setting-item">
+                <div class="setting-label">总时长</div>
+                <div class="setting-value">18个月</div>
+            </div>
+        </div>
+        <p class="setting-note">💡 如需修改时间线范围，请在 <code>static/js/app.js</code> 中修改 <code>TL_START</code>、<code>TL_END</code>、<code>TL_TOTAL</code> 常量。</p>
+    </section>
+
+    <!-- ========== 后续计划 ========== -->
+    <section class="section">
+        <h2 class="section-title">后续计划</h2>
+        <div class="settings-content">
+            <p class="setting-desc">以下功能计划在后续版本中添加：</p>
+            <ul class="setting-list">
+                <li>我的报考画像：记录适合的岗位类型、要求、薪资范围等</li>
+                <li>默认筛选条件：设置常用的筛选组合</li>
+                <li>信息源监控：配置关注的官网和公告链接</li>
+                <li>岗位表导入：支持从 Excel 批量导入岗位信息</li>
+                <li>提醒设置：配置重要节点的提醒时间</li>
+            </ul>
+        </div>
+    </section>
+{% endblock %}

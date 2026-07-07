@@ -1,0 +1,44 @@
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# 数据库（运行时生成，不提交）
+data/app.db
+data/app.db-journal
+data/app.db-wal
+data/app.db-shm
+
+# 备份文件
+backups/*.json
+backups/*.bak
+
+# 环境变量
+.env
+.env.*
+
+# 操作系统
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# 日志
+*.log

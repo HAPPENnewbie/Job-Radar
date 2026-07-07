@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}待办事项 - 2027届机会看板{% endblock %}
+
+{% block page_title %}待办事项{% endblock %}
+{% block page_desc %}查看近期需要处理的信息{% endblock %}
+
+{% block content %}
+    <!-- ========== 待办视图 ========== -->
+    <div id="todo-container">
+        <p class="placeholder">加载中...</p>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* 待办页面逻辑 */
+document.addEventListener('DOMContentLoaded', () => {
+    initTodosPage();
+});
+
+function initTodosPage() {
+    const todoContainer = document.getElementById('todo-container');
+
+    const state = {
+        opps: [],
+        events: [],
+    };
+
+    async function loadData() {
+        try {
+            const [oppsResp, eventsResp] = await Promise.all([
+                fetch('/api/opportunities'),
+                fetch('/api/timeline')
+            ]);
+            state.opps = await oppsResp.json();
+            state.events = await eventsResp.json();
+            renderTodoView();
+        } catch (e) {
+            console.error('加载数据失败', e);
+            todoContainer.innerHTML = '<p class="placeholder">加载失败，请刷新页面</p>';
+        }
+    }
+
+    loadData();
+}
+</script>
+{% endblock %}

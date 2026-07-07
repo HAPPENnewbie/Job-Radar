@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+
+{% block title %}首页总览 - 2027届机会看板{% endblock %}
+
+{% block page_title %}首页总览{% endblock %}
+{% block page_desc %}查看整体节奏和近期事项{% endblock %}
+
+{% block content %}
+    <!-- ========== 顶部基本信息 ========== -->
+    <section class="section">
+        <div class="header">
+            <h2>2027届计算机硕士毕业去向机会看板</h2>
+            <div class="header-meta">
+                <div class="meta-row">
+                    <span class="meta-label">时间范围</span>
+                    <span>2026.07 - 2027.12</span>
+                </div>
+                <div class="meta-row">
+                    <span class="meta-label">我的目标</span>
+                    <span>衡阳优先 / 湖南其次 / 全国稳定机会补充 / 互联网路线并行</span>
+                </div>
+                <div class="meta-row">
+                    <span class="meta-label">最后更新</span>
+                    <span id="last-update">-</span>
+                </div>
+            </div>
+            <div class="disclaimer">
+                ⚠️ 未发布公告的信息均参考往年节奏，最终以官网公告为准
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== 统计卡片 ========== -->
+    <section class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value" id="stat-total">0</div>
+            <div class="stat-label">总机会数</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-priority">0</div>
+            <div class="stat-label">重点关注</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-pending">0</div>
+            <div class="stat-label">待更新</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-confirmed">0</div>
+            <div class="stat-label">官方已确定</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-favorites">0</div>
+            <div class="stat-label">岗位收藏</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-recent">0</div>
+            <div class="stat-label">近30天节点</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-overdue">0</div>
+            <div class="stat-label">过期待处理</div>
+        </div>
+    </section>
+
+    <!-- ========== 最近节点 ========== -->
+    <section class="section">
+        <h2 class="section-title">最近节点</h2>
+        <div id="recent-nodes" class="recent-nodes-list">
+            <p class="placeholder">加载中...</p>
+        </div>
+    </section>
+
+    <!-- ========== 待办摘要 ========== -->
+    <section class="section">
+        <h2 class="section-title">待办摘要</h2>
+        <div id="todo-summary" class="todo-summary-grid">
+            <p class="placeholder">加载中...</p>
+        </div>
+    </section>
+
+    <!-- ========== 快捷入口 ========== -->
+    <section class="section">
+        <h2 class="section-title">快捷入口</h2>
+        <div class="quick-links">
+            <a href="/opportunities" class="quick-link-card">
+                <div class="quick-link-icon">📋</div>
+                <div class="quick-link-title">机会管理</div>
+                <div class="quick-link-desc">维护考试和招聘大类机会</div>
+            </a>
+            <a href="/job-favorites" class="quick-link-card">
+                <div class="quick-link-icon">⭐</div>
+                <div class="quick-link-title">岗位收藏</div>
+                <div class="quick-link-desc">保存具体想报的岗位</div>
+            </a>
+            <a href="/timeline" class="quick-link-card">
+                <div class="quick-link-icon">📅</div>
+                <div class="quick-link-title">时间线</div>
+                <div class="quick-link-desc">维护公告、报名、笔试、面试节点</div>
+            </a>
+            <a href="/todos" class="quick-link-card">
+                <div class="quick-link-icon">✅</div>
+                <div class="quick-link-title">待办事项</div>
+                <div class="quick-link-desc">查看近期需要处理的信息</div>
+            </a>
+        </div>
+    </section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* 首页专用逻辑 */
+document.addEventListener('DOMContentLoaded', () => {
+    loadData();
+});
+
+async function loadData() {
+    await Promise.all([loadOpps(), loadTl(), loadFavorites()]);
+    updateSummary();
+    renderStats();
+    renderRecentNodes();
+    renderTodoSummary();
+}
+
+async function loadOpps() {
+    try {
+        const resp = await fetch('/api/opportunities');
+        state.opps = await resp.json();
+    } catch (e) {
+        console.error('加载机会失败', e);
+    }
+}
+
+async function loadTl() {
+    try {
+        const resp = await fetch('/api/timeline');
+        state.tlAllEvents = await resp.json();
+    } catch (e) {
+        console.error('加载时间线失败', e);
+    }
+}
+
+async function loadFavorites() {
+    try {
+        const resp = await fetch('/api/job-favorites');
+        state.favorites = await resp.json();
+    } catch (e) {
+        console.error('加载岗位收藏失败', e);
+    }
+}
+
+function updateSummary() {
+    const all = [...state.opps, ...state.tlAllEvents];
+    const times = all.map(x => x.updated_at).filter(Boolean).sort().reverse();
+    const lastUpdEl = document.getElementById('last-update');
+    if (lastUpdEl) lastUpdEl.textContent = times.length ? times[0] : '-';
+}
+
+function renderStats() {
+    const opps = state.opps;
+    const events = state.tlAllEvents;
+    const favs = state.favorites;
+
+    document.getElementById('stat-total').textContent = opps.length;
+    document.getElementById('stat-priority').textContent = opps.filter(o => o.priority === '重点关注').length;
+    document.getElementById('stat-pending').textContent = opps.filter(o => o.status === '待更新').length;
+    document.getElementById('stat-confirmed').textContent = opps.filter(o => o.status === '官方已确定').length;
+    document.getElementById('stat-favorites').textContent = favs.length;
+
+    const now = new Date();
+    const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const curMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    const nextMonth = thirtyDaysLater.getFullYear() + '-' + String(thirtyDaysLater.getMonth() + 1).padStart(2, '0');
+    const recentEvents = events.filter(e => e.month >= curMonth && e.month <= nextMonth);
+    document.getElementById('stat-recent').textContent = recentEvents.length;
+
+    const overdueItems = opps.filter(o =>
+        (o.status === '参考往年' || o.status === '待更新') &&
+        (o.current_action === '等公告' || o.current_action === '等报名' ||
+         o.current_action === '待投递' || o.current_action === '待笔试' ||
+         o.current_action === '待面试')
+    );
+    document.getElementById('stat-overdue').textContent = overdueItems.length;
+}
+
+function renderRecentNodes() {
+    const container = document.getElementById('recent-nodes');
+    if (!container) return;
+
+    const now = new Date();
+    const curMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+
+    const upcoming = state.tlAllEvents
+        .filter(e => e.month >= curMonth)
+        .filter(e => e.status !== '已放弃')
+        .sort((a, b) => a.month.localeCompare(b.month))
+        .slice(0, 5);
+
+    if (upcoming.length === 0) {
+        container.innerHTML = '<p class="placeholder">暂无近期节点</p>';
+        return;
+    }
+
+    container.innerHTML = upcoming.map(e => `
+        <div class="recent-node-item">
+            <div class="recent-node-month">${esc(e.month)}</div>
+            <div class="recent-node-content">
+                <div class="recent-node-title">${esc(e.title)}</div>
+                <div class="recent-node-meta">
+                    ${esc(e.category)} ${statusTag(e.status)}
+                </div>
+            </div>
+            <button class="btn btn-sm btn-secondary" onclick="showTlDetail(${e.id})">查看</button>
+        </div>
+    `).join('');
+}
+
+function renderTodoSummary() {
+    const container = document.getElementById('todo-summary');
+    if (!container) return;
+
+    const opps = state.opps;
+    const now = new Date();
+    const curMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+
+    const thisMonthOpps = opps.filter(o =>
+        o.current_action === '等公告' || o.current_action === '等报名'
+    );
+
+    const overdueItems = opps.filter(o =>
+        (o.status === '参考往年' || o.status === '待更新') &&
+        (o.current_action === '等公告' || o.current_action === '等报名' ||
+         o.current_action === '待投递' || o.current_action === '待笔试' ||
+         o.current_action === '待面试')
+    );
+
+    const noLinkOpps = opps.filter(o =>
+        !o.official_url && !o.announcement_url && !o.position_url
+    );
+
+    const actionOpps = {
+        '待报名': opps.filter(o => o.current_action === '待报名'),
+        '待投递': opps.filter(o => o.current_action === '待投递'),
+        '待笔试': opps.filter(o => o.current_action === '待笔试'),
+        '待面试': opps.filter(o => o.current_action === '待面试'),
+    };
+
+    let html = `
+        <div class="todo-summary-item">
+            <div class="todo-summary-title">本月需关注 <span class="todo-summary-count">${thisMonthOpps.length}</span></div>
+            <a href="/todos" class="btn btn-sm btn-secondary">查看全部</a>
+        </div>
+        <div class="todo-summary-item">
+            <div class="todo-summary-title">过期待更新 <span class="todo-summary-count">${overdueItems.length}</span></div>
+            <a href="/todos" class="btn btn-sm btn-secondary">查看全部</a>
+        </div>
+        <div class="todo-summary-item">
+            <div class="todo-summary-title">待确认链接 <span class="todo-summary-count">${noLinkOpps.length}</span></div>
+            <a href="/todos" class="btn btn-sm btn-secondary">查看全部</a>
+        </div>
+    `;
+
+    for (const [action, items] of Object.entries(actionOpps)) {
+        if (items.length > 0) {
+            html += `
+                <div class="todo-summary-item">
+                    <div class="todo-summary-title">${action} <span class="todo-summary-count">${items.length}</span></div>
+                    <a href="/todos" class="btn btn-sm btn-secondary">查看全部</a>
+                </div>
+            `;
+        }
+    }
+
+    container.innerHTML = html;
+}
+</script>
+{% endblock %}

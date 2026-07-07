@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block title %}机会管理 - 2027届机会看板{% endblock %}
+
+{% block page_title %}机会管理{% endblock %}
+{% block page_desc %}维护考试和招聘大类机会{% endblock %}
+
+{% block content %}
+    <!-- ========== 一级分类：大类筛选 ========== -->
+    <section class="section filter-section">
+        <h3 class="filter-section-title">机会大类</h3>
+        <div class="filter-tabs" id="track-filter">
+            <button class="filter-tab active" data-value="">全部</button>
+            <button class="filter-tab" data-value="体制/准体制">🏛️ 体制内</button>
+            <button class="filter-tab" data-value="互联网/市场化">💻 计算机秋招</button>
+        </div>
+    </section>
+
+    <!-- ========== 二级筛选：详细条件 ========== -->
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <input type="text" id="search-input" class="search-input"
+                   placeholder="搜索：名称 / 类别 / 地域 / 备注...">
+            <button id="btn-clear-search" class="btn btn-secondary btn-sm">清空</button>
+            <select id="filter-priority" class="filter-select">
+                <option value="">优先级：全部</option>
+                <option value="重点关注">重点关注</option>
+                <option value="可以关注">可以关注</option>
+                <option value="低频关注">低频关注</option>
+            </select>
+            <select id="filter-region" class="filter-select">
+                <option value="">地域：全部</option>
+                <option value="衡阳">衡阳</option>
+                <option value="湖南">湖南</option>
+                <option value="全国">全国</option>
+                <option value="远程">远程</option>
+            </select>
+            <select id="filter-status" class="filter-select">
+                <option value="">状态：全部</option>
+                <option value="参考往年">参考往年</option>
+                <option value="官方已确定">官方已确定</option>
+                <option value="待更新">待更新</option>
+            </select>
+            <select id="filter-action" class="filter-select">
+                <option value="">动作：全部</option>
+                <option value="等公告">等公告</option>
+                <option value="等报名">等报名</option>
+                <option value="待投递">待投递</option>
+                <option value="已投递">已投递</option>
+                <option value="待笔试">待笔试</option>
+                <option value="待面试">待面试</option>
+                <option value="已结束">已结束</option>
+            </select>
+        </div>
+        <div class="toolbar-right">
+            <button id="btn-add-opp" class="btn btn-primary">+ 新增机会</button>
+        </div>
+    </div>
+
+    <!-- ========== 机会列表 ========== -->
+    <section class="section">
+        <h2 class="section-title">机会列表 <span id="opp-count" class="badge">0</span></h2>
+        <div id="opp-list" class="card-grid">
+            <p class="placeholder">加载中...</p>
+        </div>
+    </section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* 机会管理页面逻辑 */
+document.addEventListener('DOMContentLoaded', () => {
+    initOppPage();
+});
+
+function initOppPage() {
+    const oppList = document.getElementById('opp-list');
+    const oppCount = document.getElementById('opp-count');
+    const searchBox = document.getElementById('search-input');
+    const clearBtn = document.getElementById('btn-clear-search');
+    const trackFilter = document.getElementById('track-filter');
+    const filterPriority = document.getElementById('filter-priority');
+    const filterRegion = document.getElementById('filter-region');
+    const filterStatus = document.getElementById('filter-status');
+    const filterAction = document.getElementById('filter-action');
+
+    const state = {
+        search: '',
+        track: '',
+        priority: '',
+        region: '',
+        status: '',
+        action: '',
+        opps: [],
+    };
+
+    /* 大类筛选按钮切换 */
+    if (trackFilter) {
+        trackFilter.addEventListener('click', (e) => {
+            if (e.target.classList.contains('filter-tab')) {
+                trackFilter.querySelectorAll('.filter-tab').forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+                state.track = e.target.dataset.value;
+                loadOpps();
+            }
+        });
+    }
+
+    /* 加载数据 */
+    async function loadOpps() {
+        try {
+            const params = new URLSearchParams();
+            if (state.search) params.set('q', state.search);
+            if (state.track) params.set('track', state.track);
+            if (state.priority) params.set('priority', state.priority);
+            if (state.region) params.set('region', state.region);
+            if (state.status) params.set('status', state.status);
+            if (state.action) params.set('current_action', state.action);
+
+            const resp = await fetch('/api/opportunities?' + params.toString());
+            state.opps = await resp.json();
+            renderOpps();
+        } catch (e) {
+            console.error('加载机会失败', e);
+            oppList.innerHTML = '<p class="placeholder">加载失败，请刷新页面</p>';
+        }
+    }
+
+    /* 渲染机会列表 */
+    function renderOpps() {
+        oppCount.textContent = state.opps.length;
+        if (state.opps.length === 0) {
+            oppList.innerHTML = '<p class="placeholder">暂无匹配的机会</p>';
+            return;
+        }
+        oppList.innerHTML = state.opps.map(o => `
+            <div class="opp-card">
+                <div class="opp-card-header">
+                    <h3 class="opp-card-title">${esc(o.name)}</h3>
+                    <div class="opp-card-badges">
+                        ${trackTag(o.track)}
+                        ${statusTag(o.status)}
+                        ${priorityTag(o.priority)}
+                    </div>
+                </div>
+                <div class="opp-card-meta">
+                    <div><span class="meta-key">类别：</span>${esc(o.category)}</div>
+                    <div><span class="meta-key">地域：</span>${esc(o.region)}</div>
+                    <div><span class="meta-key">适合计算机硕：</span>${esc(o.fit_computer_master)}</div>
+                    <div><span class="meta-key">当前动作：</span>${actionTag(o.current_action)}</div>
+                    <div><span class="meta-key">公告/启动：</span>${esc(o.expected_announcement_time)}</div>
+                    <div><span class="meta-key">报名/投递：</span>${esc(o.expected_apply_time)}</div>
+                </div>
+                <div class="opp-card-links">
+                    ${linkHtml(o.official_url, '官网')}
+                    ${linkHtml(o.announcement_url, '公告')}
+                    ${linkHtml(o.position_url, '岗位表')}
+                    ${linkHtml(o.apply_url, '报名入口')}
+                </div>
+                ${o.note ? `<div class="opp-card-note">${esc(o.note)}</div>` : ''}
+                <div class="opp-card-actions">
+                    <button class="btn btn-sm btn-secondary" onclick="editOpp(${o.id})">编辑</button>
+                    <button class="btn btn-sm btn-success" onclick="setOppStatus(${o.id},'官方已确定')">官方已确定</button>
+                    <button class="btn btn-sm btn-warning" onclick="setOppStatus(${o.id},'待更新')">待更新</button>
+                    <button class="btn btn-sm btn-danger" onclick="delOpp(${o.id})">删除</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    /* 搜索 */
+    let searchTimer;
+    searchBox.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+            state.search = searchBox.value.trim();
+            loadOpps();
+        }, 300);
+    });
+
+    /* 清空搜索 */
+    clearBtn.addEventListener('click', () => {
+        searchBox.value = '';
+        state.search = '';
+        loadOpps();
+    });
+
+    /* 多级筛选 */
+    filterPriority.addEventListener('change', () => {
+        state.priority = filterPriority.value;
+        loadOpps();
+    });
+
+    filterRegion.addEventListener('change', () => {
+        state.region = filterRegion.value;
+        loadOpps();
+    });
+
+    filterStatus.addEventListener('change', () => {
+        state.status = filterStatus.value;
+        loadOpps();
+    });
+
+    filterAction.addEventListener('change', () => {
+        state.action = filterAction.value;
+        loadOpps();
+    });
+
+    /* 新增 */
+    document.getElementById('btn-add-opp').addEventListener('click', () => openOppModal(null));
+
+    /* 初始加载 */
+    loadOpps();
+
+    /* 暴露全局函数 */
+    window.editOpp = function(id) {
+        const opp = state.opps.find(o => o.id === id);
+        if (opp) openOppModal(opp);
+    };
+
+    window.delOpp = function(id) {
+        const opp = state.opps.find(o => o.id === id);
+        if (!opp) return;
+        showConfirm(`确认删除「${opp.name}」？`, async () => {
+            try {
+                await fetch(`/api/opportunities/${id}`, { method: 'DELETE' });
+                await loadOpps();
+            } catch (err) {
+                console.error(err);
+                alert('删除失败');
+            }
+        });
+    };
+
+    window.setOppStatus = async function(id, status) {
+        try {
+            await fetch(`/api/opportunities/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            });
+            await loadOpps();
+        } catch (err) {
+            console.error(err);
+        }
+    };
+}
+</script>
+{% endblock %}
