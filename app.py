@@ -71,7 +71,8 @@ def init_db():
             event_date TEXT DEFAULT '',
             date_precision TEXT DEFAULT 'month',
             end_date TEXT DEFAULT '',
-            current_action TEXT DEFAULT ''
+            current_action TEXT DEFAULT '',
+            opportunity_id INTEGER DEFAULT NULL
         );
 
         CREATE TABLE IF NOT EXISTS job_favorites (
@@ -93,7 +94,8 @@ def init_db():
             current_action TEXT NOT NULL DEFAULT '待确认',
             note TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL DEFAULT '',
-            updated_at TEXT NOT NULL DEFAULT ''
+            updated_at TEXT NOT NULL DEFAULT '',
+            opportunity_id INTEGER DEFAULT NULL
         );
     """)
     conn.commit()
@@ -142,8 +144,98 @@ def migrate_timeline_fields():
         conn.close()
 
 
-# 立即执行迁移，确保旧数据库也能升级
-migrate_timeline_fields()
+
+def backfill_opportunity_id():
+    """给历史 timeline_events / job_favorites 回填 opportunity_id。"""
+    conn = get_db()
+    try:
+        opps = conn.execute("""
+            SELECT id, name, category, track
+            FROM opportunities
+            ORDER BY id
+        """).fetchall()
+
+        for opp in opps:
+            opp_id = opp['id']
+            opp_name = opp['name'] or ''
+            opp_category = opp['category'] or ''
+            opp_track = opp['track'] or ''
+
+            category_count = conn.execute("""
+                SELECT COUNT(*)
+                FROM opportunities
+                WHERE category = ? AND track = ?
+            """, (opp_category, opp_track)).fetchone()[0]
+            category_unique = 1 if category_count == 1 else 0
+
+            conn.execute("""
+                UPDATE timeline_events
+                SET opportunity_id = ?
+                WHERE (opportunity_id IS NULL OR TRIM(CAST(opportunity_id AS TEXT)) = '')
+                  AND track = ?
+                  AND (
+                      title LIKE ?
+                      OR note LIKE ?
+                      OR (? = 1 AND category = ?)
+                  )
+            """, (
+                opp_id,
+                opp_track,
+                f"%{opp_name}%",
+                f"%{opp_name}%",
+                category_unique,
+                opp_category
+            ))
+
+            conn.execute("""
+                UPDATE job_favorites
+                SET opportunity_id = ?
+                WHERE (opportunity_id IS NULL OR TRIM(CAST(opportunity_id AS TEXT)) = '')
+                  AND (
+                      opportunity_name = ?
+                      OR opportunity_name LIKE ?
+                      OR job_name LIKE ?
+                      OR note LIKE ?
+                  )
+            """, (
+                opp_id,
+                opp_name,
+                f"%{opp_name}%",
+                f"%{opp_name}%",
+                f"%{opp_name}%"
+            ))
+
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def cleanup_orphaned_data():
+    """清理已经关联到不存在机会的孤儿时间线节点和岗位收藏。"""
+    conn = get_db()
+    try:
+        deleted_events = conn.execute("""
+            DELETE FROM timeline_events
+            WHERE opportunity_id IS NOT NULL
+              AND TRIM(CAST(opportunity_id AS TEXT)) != ''
+              AND CAST(opportunity_id AS INTEGER) NOT IN (
+                  SELECT id FROM opportunities
+              )
+        """).rowcount
+
+        deleted_favorites = conn.execute("""
+            DELETE FROM job_favorites
+            WHERE opportunity_id IS NOT NULL
+              AND TRIM(CAST(opportunity_id AS TEXT)) != ''
+              AND CAST(opportunity_id AS INTEGER) NOT IN (
+                  SELECT id FROM opportunities
+              )
+        """).rowcount
+
+        conn.commit()
+        print(f"[INFO] 清理孤儿数据：timeline_events={deleted_events}, job_favorites={deleted_favorites}")
+    finally:
+        conn.close()
 
 
 def seed_db():
@@ -475,43 +567,84 @@ def update_opportunity(oid):
 def delete_opportunity(oid):
     conn = get_db()
     try:
-        # 先查询机会信息
-        opp = conn.execute("SELECT * FROM opportunities WHERE id = ?", (oid,)).fetchone()
+        opp = conn.execute(
+            "SELECT * FROM opportunities WHERE id = ?",
+            (oid,)
+        ).fetchone()
+
         if not opp:
-            conn.close()
             return jsonify({'ok': False, 'error': '机会不存在'}), 404
 
-        # 获取机会的 name、category、track
-        opp_name = opp['name']
-        opp_category = opp['category']
-        opp_track = opp['track']
+        opp_name = opp['name'] or ''
+        opp_category = opp['category'] or ''
+        opp_track = opp['track'] or ''
 
-        # 删除关联的时间节点（优先按 opportunity_id，兜底按文本匹配）
-        deleted_events = conn.execute(
-            "DELETE FROM timeline_events WHERE opportunity_id = ? OR (opportunity_id IS NULL AND category = ? AND track = ?)",
-            (oid, opp_category, opp_track)
+        category_count = conn.execute("""
+            SELECT COUNT(*)
+            FROM opportunities
+            WHERE category = ? AND track = ?
+        """, (opp_category, opp_track)).fetchone()[0]
+        category_unique = 1 if category_count == 1 else 0
+
+        deleted_events = conn.execute("""
+            DELETE FROM timeline_events
+            WHERE CAST(opportunity_id AS TEXT) = CAST(? AS TEXT)
+               OR (
+                    (opportunity_id IS NULL OR TRIM(CAST(opportunity_id AS TEXT)) = '')
+                    AND track = ?
+                    AND (
+                        title LIKE ?
+                        OR note LIKE ?
+                        OR (? = 1 AND category = ?)
+                    )
+               )
+        """, (
+            oid,
+            opp_track,
+            f"%{opp_name}%",
+            f"%{opp_name}%",
+            category_unique,
+            opp_category
+        )).rowcount
+
+        deleted_favorites = conn.execute("""
+            DELETE FROM job_favorites
+            WHERE CAST(opportunity_id AS TEXT) = CAST(? AS TEXT)
+               OR (
+                    (opportunity_id IS NULL OR TRIM(CAST(opportunity_id AS TEXT)) = '')
+                    AND (
+                        opportunity_name = ?
+                        OR opportunity_name LIKE ?
+                        OR job_name LIKE ?
+                        OR note LIKE ?
+                    )
+               )
+        """, (
+            oid,
+            opp_name,
+            f"%{opp_name}%",
+            f"%{opp_name}%",
+            f"%{opp_name}%"
+        )).rowcount
+
+        deleted_opp = conn.execute(
+            "DELETE FROM opportunities WHERE id = ?",
+            (oid,)
         ).rowcount
 
-        # 删除关联的岗位收藏（优先按 opportunity_id，兜底按文本匹配）
-        deleted_favorites = conn.execute(
-            "DELETE FROM job_favorites WHERE opportunity_id = ? OR (opportunity_id IS NULL AND opportunity_name = ?)",
-            (oid, opp_name)
-        ).rowcount
-
-        # 删除机会本身
-        conn.execute("DELETE FROM opportunities WHERE id = ?", (oid,))
         conn.commit()
-        conn.close()
 
         return jsonify({
             'ok': True,
-            'deleted_opportunity': 1,
+            'deleted_opportunity': deleted_opp,
             'deleted_events': deleted_events,
             'deleted_favorites': deleted_favorites
         })
     except Exception as e:
-        conn.close()
+        conn.rollback()
         return jsonify({'ok': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
 
 
 # ============================================================
@@ -972,12 +1105,19 @@ def reset_data():
 
 if __name__ == '__main__':
     is_new = not os.path.exists(DB_PATH)
+
     init_db()
+    migrate_timeline_fields()
+
     if is_new:
         if seed_db():
             print("[INFO] 已从 seed/default_data.json 初始化默认数据")
         else:
             print("[WARN] 未能导入默认数据，请检查 seed/default_data.json")
+
+    backfill_opportunity_id()
+    cleanup_orphaned_data()
+
     print(f"[INFO] 数据库: {DB_PATH}")
     print("[INFO] 访问 http://127.0.0.1:5001")
     app.run(host='127.0.0.1', port=5001, debug=True)
