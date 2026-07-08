@@ -755,18 +755,29 @@ def update_opportunity(oid):
     if not sets:
         return jsonify({'error': '无可更新字段'}), 400
 
-    sets.append("updated_at = ?")
-    params.append(now)
-    params.append(oid)
-
     conn = get_db()
-    conn.execute(f"UPDATE opportunities SET {', '.join(sets)} WHERE id = ?", params)
-    conn.commit()
-    row = conn.execute("SELECT * FROM opportunities WHERE id = ?", (oid,)).fetchone()
-    conn.close()
-    if not row:
-        return jsonify({'error': '未找到该机会'}), 404
-    return jsonify(row_to_opp(row))
+    try:
+        old_opp = conn.execute("SELECT * FROM opportunities WHERE id = ?", (oid,)).fetchone()
+        if not old_opp:
+            return jsonify({'error': '未找到该机会'}), 404
+
+        sets.append("updated_at = ?")
+        params.append(now)
+        params.append(oid)
+        conn.execute(f"UPDATE opportunities SET {', '.join(sets)} WHERE id = ?", params)
+
+        new_opp = conn.execute("SELECT * FROM opportunities WHERE id = ?", (oid,)).fetchone()
+        if not new_opp:
+            return jsonify({'error': '未找到该机会'}), 404
+
+        sync_related_records_after_opportunity_update(conn, old_opp, new_opp, now)
+        conn.commit()
+        return jsonify(row_to_opp(new_opp))
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'ok': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
 
 
 @app.route('/api/opportunities/<int:oid>', methods=['DELETE'])
@@ -973,6 +984,213 @@ def event_link_for_type(opp, event_type):
     if event_type == '面试':
         return opp['announcement_url'] or opp['official_url'] or ''
     return opp['official_url'] or ''
+
+
+def row_value(row, key, default=''):
+    """安全读取 sqlite3.Row 字段。"""
+    try:
+        value = row[key]
+    except Exception:
+        return default
+    return default if value is None else value
+
+
+def replace_name_if_needed(value, old_name, new_name):
+    """只替换文本中的旧机会名称；没有旧名称时保留原值。"""
+    value = str(value or '')
+    old_name = str(old_name or '').strip()
+    new_name = str(new_name or '').strip()
+    if old_name and new_name and old_name in value:
+        return value.replace(old_name, new_name)
+    return value
+
+
+def should_follow_opportunity_value(current_value, old_value, related_value=''):
+    """判断收藏字段是否属于从机会复制来的字段，避免覆盖明显手动维护的内容。"""
+    current_value = str(current_value or '').strip()
+    old_value = str(old_value or '').strip()
+    related_value = str(related_value or '').strip()
+    return (not current_value) or (old_value and current_value == old_value) or (related_value and current_value == related_value)
+
+
+def timeline_field_mapping_for_opp(opp):
+    name = row_value(opp, 'name')
+    return [
+        ('expected_announcement_time', '公告', f"{name} 公告发布"),
+        ('expected_apply_time', '报名/投递', f"{name} 报名/投递"),
+        ('expected_exam_time', '笔试/测评', f"{name} 笔试/测评"),
+        ('expected_interview_time', '面试', f"{name} 面试"),
+    ]
+
+
+def sync_favorites_after_opportunity_update(conn, old_opp, new_opp, now):
+    """机会修改后，同步已关联的岗位收藏。"""
+    oid = row_value(new_opp, 'id')
+    old_name = row_value(old_opp, 'name')
+    old_note = row_value(old_opp, 'note')
+    new_name = row_value(new_opp, 'name')
+    new_track = row_value(new_opp, 'track')
+    new_region = row_value(new_opp, 'region')
+    new_priority = row_value(new_opp, 'priority')
+    new_action = row_value(new_opp, 'current_action')
+    new_note = row_value(new_opp, 'note')
+    new_apply_time = row_value(new_opp, 'expected_apply_time')
+    new_exam_time = row_value(new_opp, 'expected_exam_time')
+    new_interview_time = row_value(new_opp, 'expected_interview_time')
+    new_job_url = row_value(new_opp, 'position_url') or row_value(new_opp, 'apply_url') or row_value(new_opp, 'official_url')
+    new_source_url = row_value(new_opp, 'announcement_url') or row_value(new_opp, 'official_url')
+
+    # 先把历史收藏中还没有 opportunity_id、但名称能匹配的记录补齐关联。
+    if old_name:
+        conn.execute("""
+            UPDATE job_favorites
+            SET opportunity_id = ?, updated_at = ?
+            WHERE (opportunity_id IS NULL OR TRIM(CAST(opportunity_id AS TEXT)) = '')
+              AND (opportunity_name = ? OR job_name = ? OR organization = ?)
+        """, (oid, now, old_name, old_name, old_name))
+
+    favorites = conn.execute("""
+        SELECT *
+        FROM job_favorites
+        WHERE CAST(opportunity_id AS TEXT) = CAST(? AS TEXT)
+    """, (oid,)).fetchall()
+
+    for fav in favorites:
+        fav_job_name = row_value(fav, 'job_name')
+        fav_opp_name = row_value(fav, 'opportunity_name')
+        fav_org = row_value(fav, 'organization')
+        fav_note = row_value(fav, 'note')
+
+        synced_job_name = new_name if should_follow_opportunity_value(fav_job_name, old_name, fav_opp_name) else replace_name_if_needed(fav_job_name, old_name, new_name)
+        synced_org = new_name if should_follow_opportunity_value(fav_org, old_name, fav_opp_name) else replace_name_if_needed(fav_org, old_name, new_name)
+        synced_note = new_note if should_follow_opportunity_value(fav_note, old_note) else replace_name_if_needed(fav_note, old_name, new_name)
+
+        conn.execute("""
+            UPDATE job_favorites
+            SET job_name = ?,
+                opportunity_name = ?,
+                track = ?,
+                organization = ?,
+                region = ?,
+                apply_time = ?,
+                exam_time = ?,
+                interview_time = ?,
+                job_url = ?,
+                source_url = ?,
+                priority = ?,
+                current_action = ?,
+                note = ?,
+                updated_at = ?
+            WHERE id = ?
+        """, (
+            synced_job_name, new_name, new_track, synced_org, new_region,
+            new_apply_time, new_exam_time, new_interview_time, new_job_url,
+            new_source_url, new_priority, new_action, synced_note, now,
+            row_value(fav, 'id')
+        ))
+
+
+def sync_timeline_after_opportunity_update(conn, old_opp, new_opp, now):
+    """机会修改后，同步已关联的时间线节点和历史可匹配节点。"""
+    oid = row_value(new_opp, 'id')
+    old_name = row_value(old_opp, 'name')
+    new_name = row_value(new_opp, 'name')
+    new_track = row_value(new_opp, 'track')
+    new_category = row_value(new_opp, 'category')
+    new_status = row_value(new_opp, 'status')
+    new_action = row_value(new_opp, 'current_action')
+    old_category = row_value(old_opp, 'category')
+    old_track = row_value(old_opp, 'track')
+
+    # 兼容旧数据：把没有 opportunity_id 但明显属于该机会的节点先补齐关联。
+    if old_name:
+        conn.execute("""
+            UPDATE timeline_events
+            SET opportunity_id = ?, updated_at = ?
+            WHERE (opportunity_id IS NULL OR TRIM(CAST(opportunity_id AS TEXT)) = '')
+              AND (
+                    title LIKE ? OR note LIKE ?
+                    OR (category = ? AND track = ?)
+              )
+        """, (oid, now, f"%{old_name}%", f"%{old_name}%", old_category, old_track))
+
+    mapping = {event_type: (field, default_title) for field, event_type, default_title in timeline_field_mapping_for_opp(new_opp)}
+    events = conn.execute("""
+        SELECT *
+        FROM timeline_events
+        WHERE CAST(opportunity_id AS TEXT) = CAST(? AS TEXT)
+    """, (oid,)).fetchall()
+
+    for ev in events:
+        event_type = row_value(ev, 'event_type') or '其他'
+        event_id = row_value(ev, 'id')
+        link = event_link_for_type(new_opp, event_type)
+
+        if event_type in mapping:
+            field, default_title = mapping[event_type]
+            parsed = parse_standard_time_value(row_value(new_opp, field))
+            if parsed:
+                conn.execute("""
+                    UPDATE timeline_events
+                    SET month = ?,
+                        date = ?,
+                        title = ?,
+                        track = ?,
+                        category = ?,
+                        status = ?,
+                        link = ?,
+                        event_date = ?,
+                        date_precision = ?,
+                        end_date = ?,
+                        current_action = ?,
+                        updated_at = ?
+                    WHERE id = ?
+                """, (
+                    parsed['month'], parsed['date'], default_title, new_track,
+                    new_category, new_status, link, parsed['event_date'],
+                    parsed['date_precision'], parsed['end_date'], new_action or '',
+                    now, event_id
+                ))
+            else:
+                conn.execute("""
+                    UPDATE timeline_events
+                    SET title = ?,
+                        track = ?,
+                        category = ?,
+                        status = ?,
+                        link = ?,
+                        current_action = ?,
+                        updated_at = ?
+                    WHERE id = ?
+                """, (
+                    default_title, new_track, new_category, new_status, link,
+                    new_action or '', now, event_id
+                ))
+        else:
+            current_title = row_value(ev, 'title')
+            current_note = row_value(ev, 'note')
+            synced_title = replace_name_if_needed(current_title, old_name, new_name)
+            synced_note = replace_name_if_needed(current_note, old_name, new_name)
+            conn.execute("""
+                UPDATE timeline_events
+                SET title = ?,
+                    track = ?,
+                    category = ?,
+                    status = ?,
+                    note = ?,
+                    current_action = ?,
+                    updated_at = ?
+                WHERE id = ?
+            """, (
+                synced_title, new_track, new_category, new_status,
+                synced_note, new_action or '', now, event_id
+            ))
+
+
+def sync_related_records_after_opportunity_update(conn, old_opp, new_opp, now):
+    """机会修改后，级联同步收藏和日历。"""
+    sync_favorites_after_opportunity_update(conn, old_opp, new_opp, now)
+    sync_timeline_after_opportunity_update(conn, old_opp, new_opp, now)
 
 
 @app.route('/api/opportunities/<int:oid>/sync-timeline', methods=['POST'])
