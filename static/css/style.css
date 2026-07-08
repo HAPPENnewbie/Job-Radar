@@ -2910,7 +2910,7 @@ select::-ms-expand,
         var(--event-bg) !important;
     box-shadow:
         0 8px 20px rgba(15, 23, 42, .045),
-        inset 3px 0 0 var(--event-accent),
+        inset 5px 0 0 var(--event-accent),
         inset 0 1px 0 rgba(255,255,255,.88) !important;
     transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
 }
@@ -2923,7 +2923,7 @@ select::-ms-expand,
         var(--event-bg) !important;
     box-shadow:
         0 12px 28px rgba(15, 23, 42, .075),
-        inset 4px 0 0 var(--event-accent),
+        inset 6px 0 0 var(--event-accent),
         inset 0 1px 0 rgba(255,255,255,.92) !important;
 }
 
@@ -2944,10 +2944,10 @@ select::-ms-expand,
 
 .event-color-dot {
     display: inline-flex;
-    width: 9px;
-    height: 9px;
-    min-width: 9px;
-    margin-right: 7px;
+    width: 11px;
+    height: 11px;
+    min-width: 11px;
+    margin-right: 8px;
     border-radius: 999px;
     vertical-align: 1px;
     background: var(--event-accent);

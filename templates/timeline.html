@@ -92,15 +92,54 @@ const DEFAULT_CALENDAR_CATEGORIES = [
 ];
 
 const CALENDAR_COLOR_PALETTE = [
-    { accent: '#4f7cff', bg: 'rgba(79, 124, 255, .10)', border: 'rgba(79, 124, 255, .30)' },
-    { accent: '#0ea5a8', bg: 'rgba(14, 165, 168, .10)', border: 'rgba(14, 165, 168, .28)' },
-    { accent: '#8b5cf6', bg: 'rgba(139, 92, 246, .10)', border: 'rgba(139, 92, 246, .28)' },
-    { accent: '#f59e0b', bg: 'rgba(245, 158, 11, .11)', border: 'rgba(245, 158, 11, .30)' },
-    { accent: '#10b981', bg: 'rgba(16, 185, 129, .10)', border: 'rgba(16, 185, 129, .28)' },
-    { accent: '#ef6f91', bg: 'rgba(239, 111, 145, .10)', border: 'rgba(239, 111, 145, .28)' },
+    { accent: '#2563eb', bg: 'rgba(37, 99, 235, .105)', border: 'rgba(37, 99, 235, .30)' },
+    { accent: '#0891b2', bg: 'rgba(8, 145, 178, .105)', border: 'rgba(8, 145, 178, .30)' },
+    { accent: '#7c3aed', bg: 'rgba(124, 58, 237, .105)', border: 'rgba(124, 58, 237, .30)' },
+    { accent: '#db2777', bg: 'rgba(219, 39, 119, .095)', border: 'rgba(219, 39, 119, .28)' },
+    { accent: '#059669', bg: 'rgba(5, 150, 105, .105)', border: 'rgba(5, 150, 105, .30)' },
+    { accent: '#d97706', bg: 'rgba(217, 119, 6, .105)', border: 'rgba(217, 119, 6, .30)' },
+    { accent: '#4f46e5', bg: 'rgba(79, 70, 229, .105)', border: 'rgba(79, 70, 229, .30)' },
+    { accent: '#0f766e', bg: 'rgba(15, 118, 110, .105)', border: 'rgba(15, 118, 110, .30)' },
+    { accent: '#9333ea', bg: 'rgba(147, 51, 234, .10)', border: 'rgba(147, 51, 234, .28)' },
+    { accent: '#be123c', bg: 'rgba(190, 18, 60, .09)', border: 'rgba(190, 18, 60, .26)' },
+    { accent: '#0284c7', bg: 'rgba(2, 132, 199, .10)', border: 'rgba(2, 132, 199, .28)' },
+    { accent: '#65a30d', bg: 'rgba(101, 163, 13, .10)', border: 'rgba(101, 163, 13, .28)' },
+    { accent: '#c2410c', bg: 'rgba(194, 65, 12, .095)', border: 'rgba(194, 65, 12, .27)' },
+    { accent: '#4338ca', bg: 'rgba(67, 56, 202, .10)', border: 'rgba(67, 56, 202, .28)' },
+    { accent: '#047857', bg: 'rgba(4, 120, 87, .105)', border: 'rgba(4, 120, 87, .30)' },
+    { accent: '#a21caf', bg: 'rgba(162, 28, 175, .095)', border: 'rgba(162, 28, 175, .27)' },
+    { accent: '#0369a1', bg: 'rgba(3, 105, 161, .10)', border: 'rgba(3, 105, 161, .28)' },
+    { accent: '#15803d', bg: 'rgba(21, 128, 61, .10)', border: 'rgba(21, 128, 61, .28)' },
+    { accent: '#b45309', bg: 'rgba(180, 83, 9, .095)', border: 'rgba(180, 83, 9, .27)' },
+    { accent: '#1d4ed8', bg: 'rgba(29, 78, 216, .10)', border: 'rgba(29, 78, 216, .28)' },
+    { accent: '#0e7490', bg: 'rgba(14, 116, 144, .10)', border: 'rgba(14, 116, 144, .28)' },
+    { accent: '#6d28d9', bg: 'rgba(109, 40, 217, .10)', border: 'rgba(109, 40, 217, .28)' },
+    { accent: '#9f1239', bg: 'rgba(159, 18, 57, .09)', border: 'rgba(159, 18, 57, .26)' },
     { accent: '#64748b', bg: 'rgba(100, 116, 139, .10)', border: 'rgba(100, 116, 139, .26)' },
-    { accent: '#06b6d4', bg: 'rgba(6, 182, 212, .10)', border: 'rgba(6, 182, 212, .28)' },
 ];
+
+let calendarColorMap = new Map();
+
+function rebuildCalendarColorMap(events) {
+    const named = new Map();
+    (events || []).forEach(e => {
+        const key = eventIdentityKey(e);
+        if (!key) return;
+        if (!named.has(key)) named.set(key, eventIdentityName(e));
+    });
+
+    const orderedKeys = Array.from(named.entries())
+        .sort((a, b) => {
+            const nameCompare = String(a[1] || '').localeCompare(String(b[1] || ''), 'zh-Hans-CN');
+            return nameCompare || String(a[0]).localeCompare(String(b[0]));
+        })
+        .map(([key]) => key);
+
+    calendarColorMap = new Map();
+    orderedKeys.forEach((key, index) => {
+        calendarColorMap.set(key, CALENDAR_COLOR_PALETTE[index % CALENDAR_COLOR_PALETTE.length]);
+    });
+}
 
 function calendarCategoryGroups() {
     const cfg = window.JOB_RADAR_SETTINGS || {};
@@ -144,8 +183,8 @@ function eventIdentityKey(e) {
 }
 
 function eventColor(e) {
-    const palette = CALENDAR_COLOR_PALETTE[stableHash(eventIdentityKey(e)) % CALENDAR_COLOR_PALETTE.length];
-    return palette;
+    const key = eventIdentityKey(e);
+    return calendarColorMap.get(key) || CALENDAR_COLOR_PALETTE[stableHash(key) % CALENDAR_COLOR_PALETTE.length];
 }
 
 function eventColorStyle(e) {
@@ -230,6 +269,7 @@ async function loadCalendarEvents() {
         const resp = await fetch('/api/timeline');
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         calendarState.events = await resp.json();
+        rebuildCalendarColorMap(calendarState.events);
         renderCalendar();
         renderEventList();
         if (calendarState.currentMonth) showMonthDetail(calendarState.currentMonth);
