@@ -201,12 +201,36 @@ function formatTimeValueSafe(value) {
     return value || '';
 }
 
+
+function installWindowFunctions() {
+    window.state = state;
+    window.renderOpps = renderOpps;
+    window.openOppModal = openOppModal;
+    window.saveOpp = saveOpp;
+    window.editOpp = editOpp;
+    window.delOpp = delOpp;
+    window.setOppStatus = setOppStatus;
+    window.syncTimeline = syncTimeline;
+    window.favoriteOpp = favoriteOpp;
+    window.unfavoriteOpp = unfavoriteOpp;
+    window.openFavModal = openFavModal;
+    window.saveFav = saveFav;
+    window.editFav = editFav;
+    window.delFav = delFav;
+    window.renderFavorites = renderFavorites;
+    window.loadData = loadData;
+    window.loadOpps = loadOpps;
+    window.loadTl = loadTl;
+    window.loadFavorites = loadFavorites;
+}
+
 /* ============================================================
    初始化
    ============================================================ */
 document.addEventListener('DOMContentLoaded', init);
 
 function init() {
+    installWindowFunctions();
     bindSidebar();
     bindCommonEvents();
     loadData();
@@ -334,9 +358,9 @@ function bindCommonEvents() {
         });
     }
 
-    bindSubmit('form-opp', saveOpp);
-    bindSubmit('form-event', saveEv);
-    bindSubmit('form-fav', saveFav);
+    bindSubmit('form-opp', window.saveOpp || saveOpp);
+    bindSubmit('form-event', window.saveEv || saveEv);
+    bindSubmit('form-fav', window.saveFav || saveFav);
 
     bindConfirmButtons();
 }
@@ -389,6 +413,7 @@ async function loadData() {
         }
     });
 
+    safeInvoke('renderOpps', renderOpps);
     safeInvoke('updateSummary', updateSummary);
     safeInvoke('renderStats', renderStats);
     safeInvoke('renderTodoView', renderTodoView);
@@ -572,20 +597,94 @@ function renderHomeOverview() {
 /* ============================================================
    机会管理
    ============================================================ */
+function favoriteForOpp(opp) {
+    if (!opp || !Array.isArray(state.favorites)) return null;
+    return state.favorites.find(f =>
+        (f.opportunity_id && String(f.opportunity_id) === String(opp.id)) ||
+        (!f.opportunity_id && f.opportunity_name === opp.name)
+    ) || null;
+}
+
+async function favoriteOpp(id) {
+    const opp = (state.opps || []).find(o => Number(o.id) === Number(id));
+    if (!opp) return;
+    const btn = document.querySelector(`[data-fav-opp-id="${id}"]`);
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '收藏中...';
+    }
+    try {
+        await fetchJson(`/api/opportunities/${id}/favorite`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ opportunity_id: id }),
+        });
+        await loadData();
+    } catch (err) {
+        console.error(err);
+        alert(err.message || '收藏失败');
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '收藏';
+        }
+    }
+}
+
+async function unfavoriteOpp(id) {
+    const opp = (state.opps || []).find(o => Number(o.id) === Number(id));
+    if (!opp) return;
+    showConfirm(`确认取消收藏「${opp.name}」？`, async () => {
+        const btn = document.querySelector(`[data-fav-opp-id="${id}"]`);
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = '处理中...';
+        }
+        try {
+            await fetchJson(`/api/opportunities/${id}/favorite`, { method: 'DELETE' });
+            await loadData();
+        } catch (err) {
+            console.error(err);
+            alert(err.message || '取消收藏失败');
+            if (btn) btn.disabled = false;
+        }
+    });
+}
+
 function renderOpps() {
     if (!oppList || !oppCount) return;
-    oppCount.textContent = state.opps.length;
-    if (state.opps.length === 0) {
+    const opps = state.opps || [];
+    oppCount.textContent = opps.length;
+    if (opps.length === 0) {
         oppList.innerHTML = '<p class="placeholder">暂无匹配的机会</p>';
         return;
     }
-    oppList.innerHTML = state.opps.map(o => `
-        <div class="opp-card" data-id="${o.id}">
+
+    const events = state.tlAllEvents || [];
+    const timelineStats = {};
+    events.forEach(ev => {
+        if (!ev.opportunity_id) return;
+        const key = String(ev.opportunity_id);
+        if (!timelineStats[key]) timelineStats[key] = { types: new Set(), total: 0 };
+        if (ev.event_type) timelineStats[key].types.add(ev.event_type);
+        timelineStats[key].total += 1;
+    });
+    const coreTypes = ['公告', '报名/投递', '笔试/测评', '面试'];
+
+    oppList.innerHTML = opps.map(o => {
+        const stats = timelineStats[String(o.id)] || { types: new Set(), total: 0 };
+        const coreCount = coreTypes.filter(t => stats.types.has(t)).length;
+        const missingTypes = coreTypes.filter(t => !stats.types.has(t));
+        const fav = favoriteForOpp(o);
+        const favBtn = fav
+            ? `<button class="btn btn-sm btn-favorited" data-fav-opp-id="${o.id}" onclick="unfavoriteOpp(${o.id})">已收藏</button>`
+            : `<button class="btn btn-sm btn-primary" data-fav-opp-id="${o.id}" onclick="favoriteOpp(${o.id})">收藏</button>`;
+        return `
+        <div class="opp-card compact-opp-card" data-id="${o.id}">
             <div class="opp-card-header">
                 <h3 class="opp-card-title">${esc(o.name)}</h3>
                 <div class="opp-card-badges">${trackTag(o.track)}${statusTag(o.status)}${priorityTag(o.priority)}</div>
             </div>
-            <div class="opp-card-meta">
+            <div class="opp-card-meta compact-meta">
                 <div><span class="meta-key">类别：</span>${esc(o.category)}</div>
                 <div><span class="meta-key">地域：</span>${esc(o.region)}</div>
                 <div><span class="meta-key">适合计算机硕：</span>${esc(o.fit_computer_master)}</div>
@@ -595,16 +694,27 @@ function renderOpps() {
                 <div><span class="meta-key">笔试：</span>${esc(formatTimeValueSafe(o.expected_exam_time))}</div>
                 <div><span class="meta-key">面试：</span>${esc(formatTimeValueSafe(o.expected_interview_time))}</div>
             </div>
+            <div class="opp-card-timeline compact-timeline-box">
+                <div class="timeline-completeness">
+                    <span class="meta-key">时间线：</span><span class="timeline-count">${coreCount}/4</span>
+                    ${missingTypes.length > 0 ? `<span class="timeline-missing">缺少：${esc(missingTypes.join('、'))}</span>` : '<span class="timeline-complete">✓ 完整</span>'}
+                </div>
+                <div class="timeline-actions">
+                    <button class="btn btn-sm btn-primary" onclick="syncTimeline(${o.id})">同步时间线</button>
+                    <a href="/timeline?opportunity_id=${o.id}" class="btn btn-sm btn-secondary">查看日历</a>
+                </div>
+            </div>
             <div class="opp-card-links">${linkHtml(o.official_url, '官网')}${linkHtml(o.announcement_url, '公告')}${linkHtml(o.position_url, '岗位表')}${linkHtml(o.apply_url, '报名入口')}</div>
             ${o.note ? `<div class="opp-card-note">${esc(o.note)}</div>` : ''}
-            <div class="opp-card-actions">
+            <div class="opp-card-actions compact-actions">
+                ${favBtn}
                 <button class="btn btn-sm btn-secondary" onclick="editOpp(${o.id})">编辑</button>
                 <button class="btn btn-sm btn-success" onclick="setOppStatus(${o.id},'官方已确定')">官方已确定</button>
                 <button class="btn btn-sm btn-warning" onclick="setOppStatus(${o.id},'待更新')">待更新</button>
                 <button class="btn btn-sm btn-danger" onclick="delOpp(${o.id})">删除</button>
             </div>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 }
 
 function openOppModal(opp) {
@@ -617,10 +727,17 @@ function openOppModal(opp) {
     setValue('opp-priority', opp ? opp.priority : '可以关注');
     setValue('opp-region', opp ? opp.region : '全国');
     setValue('opp-fit', opp ? opp.fit_computer_master : '待确认');
-    setValue('opp-ann-time', opp ? opp.expected_announcement_time : '');
-    setValue('opp-app-time', opp ? opp.expected_apply_time : '');
-    setValue('opp-exam-time', opp ? opp.expected_exam_time : '');
-    setValue('opp-int-time', opp ? opp.expected_interview_time : '');
+    if (typeof window.setupTimePicker === 'function') {
+        window.setupTimePicker('opp-ann-time', opp ? opp.expected_announcement_time : '');
+        window.setupTimePicker('opp-app-time', opp ? opp.expected_apply_time : '');
+        window.setupTimePicker('opp-exam-time', opp ? opp.expected_exam_time : '');
+        window.setupTimePicker('opp-int-time', opp ? opp.expected_interview_time : '');
+    } else {
+        setValue('opp-ann-time', opp ? opp.expected_announcement_time : '');
+        setValue('opp-app-time', opp ? opp.expected_apply_time : '');
+        setValue('opp-exam-time', opp ? opp.expected_exam_time : '');
+        setValue('opp-int-time', opp ? opp.expected_interview_time : '');
+    }
     setValue('opp-url', opp ? opp.official_url : '');
     setValue('opp-ann-url', opp ? opp.announcement_url : '');
     setValue('opp-pos-url', opp ? opp.position_url : '');
@@ -648,10 +765,10 @@ async function saveOpp(e) {
         priority: valueOf('opp-priority'),
         region: valueOf('opp-region'),
         fit_computer_master: valueOf('opp-fit'),
-        expected_announcement_time: valueOf('opp-ann-time').trim(),
-        expected_apply_time: valueOf('opp-app-time').trim(),
-        expected_exam_time: valueOf('opp-exam-time').trim(),
-        expected_interview_time: valueOf('opp-int-time').trim(),
+        expected_announcement_time: typeof window.readTimePicker === 'function' ? window.readTimePicker('opp-ann-time') : valueOf('opp-ann-time').trim(),
+        expected_apply_time: typeof window.readTimePicker === 'function' ? window.readTimePicker('opp-app-time') : valueOf('opp-app-time').trim(),
+        expected_exam_time: typeof window.readTimePicker === 'function' ? window.readTimePicker('opp-exam-time') : valueOf('opp-exam-time').trim(),
+        expected_interview_time: typeof window.readTimePicker === 'function' ? window.readTimePicker('opp-int-time') : valueOf('opp-int-time').trim(),
         official_url: valueOf('opp-url').trim(),
         announcement_url: valueOf('opp-ann-url').trim(),
         position_url: valueOf('opp-pos-url').trim(),
@@ -1119,9 +1236,15 @@ function openFavModal(fav) {
     setValue('fav-region', fav.region || '衡阳');
     setValue('fav-major', fav.major_requirement || '');
     setValue('fav-education', fav.education_requirement || '');
-    setValue('fav-apply-time', fav.apply_time || '');
-    setValue('fav-exam-time', fav.exam_time || '');
-    setValue('fav-interview-time', fav.interview_time || '');
+    if (typeof window.setupTimePicker === 'function') {
+        window.setupTimePicker('fav-apply-time', fav.apply_time || '');
+        window.setupTimePicker('fav-exam-time', fav.exam_time || '');
+        window.setupTimePicker('fav-interview-time', fav.interview_time || '');
+    } else {
+        setValue('fav-apply-time', fav.apply_time || '');
+        setValue('fav-exam-time', fav.exam_time || '');
+        setValue('fav-interview-time', fav.interview_time || '');
+    }
     setValue('fav-job-url', fav.job_url || '');
     setValue('fav-source-url', fav.source_url || '');
     setValue('fav-match-status', fav.match_status || '未判断');
@@ -1148,9 +1271,9 @@ async function saveFav(e) {
         region: valueOf('fav-region'),
         major_requirement: valueOf('fav-major').trim(),
         education_requirement: valueOf('fav-education').trim(),
-        apply_time: valueOf('fav-apply-time').trim(),
-        exam_time: valueOf('fav-exam-time').trim(),
-        interview_time: valueOf('fav-interview-time').trim(),
+        apply_time: typeof window.readTimePicker === 'function' ? window.readTimePicker('fav-apply-time') : valueOf('fav-apply-time').trim(),
+        exam_time: typeof window.readTimePicker === 'function' ? window.readTimePicker('fav-exam-time') : valueOf('fav-exam-time').trim(),
+        interview_time: typeof window.readTimePicker === 'function' ? window.readTimePicker('fav-interview-time') : valueOf('fav-interview-time').trim(),
         job_url: valueOf('fav-job-url').trim(),
         source_url: valueOf('fav-source-url').trim(),
         match_status: valueOf('fav-match-status'),
@@ -1245,3 +1368,17 @@ window.deleteEvent = delEv;
 window.setEventStatus = setEvStatus;
 window.showEventDetail = showTlDetail;
 
+
+
+window.renderOpps = renderOpps;
+window.openOppModal = openOppModal;
+window.saveOpp = saveOpp;
+window.favoriteOpp = favoriteOpp;
+window.unfavoriteOpp = unfavoriteOpp;
+window.renderFavorites = renderFavorites;
+window.openFavModal = openFavModal;
+window.saveFav = saveFav;
+window.editFav = editFav;
+window.delFav = delFav;
+window.loadData = loadData;
+window.loadFavorites = loadFavorites;
