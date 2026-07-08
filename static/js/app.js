@@ -1056,20 +1056,52 @@ function showTlDetail(id) {
     if (tlTooltip) tlTooltip.style.display = 'none';
     const ev = (state.tlAllEvents || []).find(e => Number(e.id) === Number(id));
     if (!ev || !tlDetailModal || !tlDetailBody || !$('tl-detail-title')) return;
-    $('tl-detail-title').textContent = ev.title;
-    let html = '';
-    html += `<div class="detail-modal-field"><span class="detail-modal-key">${ev.date || ev.event_date ? '日期' : '月份'}</span><span class="detail-modal-val">${esc(ev.event_date || ev.date || ev.month)}</span></div>`;
-    if (ev.end_date) html += `<div class="detail-modal-field"><span class="detail-modal-key">结束</span><span class="detail-modal-val">${esc(ev.end_date)}</span></div>`;
-    html += `<div class="detail-modal-field"><span class="detail-modal-key">节点类型</span><span class="detail-modal-val">${esc(ev.event_type || '其他')}</span></div>`;
-    if (ev.opportunity_name) html += `<div class="detail-modal-field"><span class="detail-modal-key">关联机会</span><span class="detail-modal-val">${esc(ev.opportunity_name)}</span></div>`;
-    html += `<div class="detail-modal-field"><span class="detail-modal-key">类别</span><span class="detail-modal-val">${esc(ev.category)}</span></div>`;
-    html += `<div class="detail-modal-field"><span class="detail-modal-key">大类</span><span class="detail-modal-val">${trackTag(ev.track)}</span></div>`;
-    html += `<div class="detail-modal-field"><span class="detail-modal-key">状态</span><span class="detail-modal-val">${statusTag(ev.status)}</span></div>`;
-    if (ev.current_action) html += `<div class="detail-modal-field"><span class="detail-modal-key">当前动作</span><span class="detail-modal-val">${esc(ev.current_action)}</span></div>`;
-    if (ev.link) html += `<div class="detail-modal-field"><span class="detail-modal-key">链接</span><span class="detail-modal-val">${linkHtml(ev.link, '打开链接')}</span></div>`;
-    if (ev.note) html += `<div class="detail-modal-note">${esc(ev.note)}</div>`;
-    html += `<div class="detail-modal-actions"><button class="btn btn-sm btn-secondary" onclick="editEv(${ev.id})">编辑</button><button class="btn btn-sm btn-success" onclick="setEvStatus(${ev.id},'官方已确定')">官方已确定</button><button class="btn btn-sm btn-warning" onclick="setEvStatus(${ev.id},'待更新')">待更新</button><button class="btn btn-sm btn-danger" onclick="delEvFromDetail(${ev.id})">删除</button></div>`;
-    tlDetailBody.innerHTML = html;
+
+    const mainDate = ev.event_date || ev.date || ev.month || '';
+    const dateLabel = (ev.date || ev.event_date) ? '日期' : '月份';
+    const subtitleParts = [mainDate, ev.event_type || '其他', ev.category].filter(Boolean);
+    $('tl-detail-title').textContent = ev.title || '节点详情';
+
+    const rows = [
+        [dateLabel, mainDate],
+        ev.end_date ? ['结束', ev.end_date] : null,
+        ['节点类型', ev.event_type || '其他'],
+        ev.opportunity_name ? ['关联机会', ev.opportunity_name] : null,
+        ['类别', ev.category || '-'],
+        ['大类', trackTag(ev.track) || '-'],
+        ['状态', statusTag(ev.status) || '-'],
+        ev.current_action ? ['当前动作', actionTag(ev.current_action)] : null,
+        ev.link ? ['链接', linkHtml(ev.link, '打开链接')] : null,
+    ].filter(Boolean);
+
+    const gridHtml = rows.map(([label, value]) => `
+        <div class="detail-row">
+            <div class="detail-label">${esc(label)}</div>
+            <div class="detail-value">${typeof value === 'string' && value.includes('<') ? value : esc(value)}</div>
+        </div>
+    `).join('');
+
+    tlDetailBody.innerHTML = `
+        <div class="detail-hero">
+            <div class="detail-hero-main">
+                <div class="detail-eyebrow">时间节点详情</div>
+                <h4 class="detail-title">${esc(ev.title || '未命名节点')}</h4>
+                <div class="detail-subtitle">${esc(subtitleParts.join(' · '))}</div>
+            </div>
+            <div class="detail-hero-tags">
+                ${ev.status ? statusTag(ev.status) : ''}
+                ${ev.track ? trackTag(ev.track) : ''}
+            </div>
+        </div>
+        <div class="detail-grid">${gridHtml}</div>
+        ${ev.note ? `<div class="detail-note"><div class="detail-label">备注</div><div>${esc(ev.note)}</div></div>` : ''}
+        <div class="detail-actions">
+            <button class="btn btn-sm btn-secondary" onclick="editEv(${ev.id})">编辑</button>
+            <button class="btn btn-sm btn-success" onclick="setEvStatus(${ev.id},'官方已确定')">官方已确定</button>
+            <button class="btn btn-sm btn-warning" onclick="setEvStatus(${ev.id},'待更新')">待更新</button>
+            <button class="btn btn-sm btn-danger" onclick="delEvFromDetail(${ev.id})">删除</button>
+        </div>
+    `;
     tlDetailModal.style.display = 'flex';
 }
 
@@ -1097,8 +1129,13 @@ function renderDetailList() {
     tlDetailList.innerHTML = events.map(e => `
         <div class="detail-item" onclick="showTlDetail(${e.id})">
             <span class="detail-item-month">${esc(e.event_date || e.date || e.month)}</span>
-            <span class="detail-item-title">${esc(e.title)}</span>
-            <div class="detail-item-badges">${trackTag(e.track)}${statusTag(e.status)}</div>
+            <span class="detail-item-main">
+                <span class="detail-item-title">${esc(e.title)}</span>
+                <span class="detail-item-meta">
+                    ${esc(e.event_type || '其他')} · ${esc(e.category || '-')} · ${esc(e.track || '-')} ${e.opportunity_name ? '· ' + esc(e.opportunity_name) : ''}
+                </span>
+            </span>
+            <span class="detail-item-badges">${statusTag(e.status)}</span>
         </div>
     `).join('');
 }
@@ -1274,11 +1311,34 @@ function downloadJson(data, filename) {
     URL.revokeObjectURL(url);
 }
 
+function ensureConfirmLayout() {
+    if (!confirmDlg || !confirmMsg) return;
+    const card = confirmDlg.querySelector('.modal-content');
+    if (!card || card.dataset.confirmEnhanced === '1') return;
+    card.dataset.confirmEnhanced = '1';
+    card.classList.add('confirm-card');
+
+    const header = document.createElement('div');
+    header.className = 'confirm-header';
+    header.textContent = '确认操作';
+    card.insertBefore(header, card.firstChild);
+
+    const body = document.createElement('div');
+    body.className = 'confirm-body';
+    confirmMsg.parentNode.insertBefore(body, confirmMsg);
+    body.appendChild(confirmMsg);
+    confirmMsg.classList.add('confirm-message-text');
+
+    const actions = card.querySelector('.form-actions');
+    if (actions) actions.classList.add('confirm-actions');
+}
+
 function showConfirm(msg, cb) {
     if (!confirmDlg || !confirmMsg) {
         if (window.confirm(msg)) cb && cb();
         return;
     }
+    ensureConfirmLayout();
     confirmMsg.textContent = msg;
     confirmCallback = cb;
     confirmDlg.style.display = 'flex';
