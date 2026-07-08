@@ -240,6 +240,7 @@ function bindSidebar() {
     const sidebarToggle = $('sidebar-toggle');
     const sidebar = document.querySelector('.sidebar');
     const mainContent = document.querySelector('.main-content');
+    bindSidebarResize(sidebar);
 
     if (sidebarToggle && sidebar && !sidebarToggle.dataset.mobileBound) {
         sidebarToggle.dataset.mobileBound = '1';
@@ -256,6 +257,60 @@ function bindSidebar() {
     }
 }
 
+
+function bindSidebarResize(sidebar) {
+    if (!sidebar || sidebar.dataset.resizeReady === '1') return;
+    sidebar.dataset.resizeReady = '1';
+
+    const root = document.documentElement;
+    const savedWidth = Number(localStorage.getItem('jrSidebarWidth') || 0);
+    if (savedWidth >= 196 && savedWidth <= 340 && window.innerWidth > 1024) {
+        root.style.setProperty('--sidebar-w', `${savedWidth}px`);
+    }
+
+    let handle = sidebar.querySelector('.sidebar-resizer');
+    if (!handle) {
+        handle = document.createElement('div');
+        handle.className = 'sidebar-resizer';
+        handle.setAttribute('role', 'separator');
+        handle.setAttribute('aria-orientation', 'vertical');
+        handle.setAttribute('title', '拖动调整侧边栏宽度');
+        sidebar.appendChild(handle);
+    }
+
+    let startX = 0;
+    let startWidth = 0;
+    let dragging = false;
+
+    const clampWidth = (value) => Math.max(196, Math.min(340, value));
+
+    handle.addEventListener('pointerdown', (e) => {
+        if (window.innerWidth <= 1024 || root.classList.contains('sidebar-collapsed')) return;
+        dragging = true;
+        startX = e.clientX;
+        startWidth = sidebar.getBoundingClientRect().width;
+        handle.setPointerCapture(e.pointerId);
+        root.classList.add('sidebar-resizing');
+        e.preventDefault();
+    });
+
+    handle.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        const next = clampWidth(startWidth + e.clientX - startX);
+        root.style.setProperty('--sidebar-w', `${next}px`);
+        localStorage.setItem('jrSidebarWidth', String(Math.round(next)));
+    });
+
+    const stopDrag = (e) => {
+        if (!dragging) return;
+        dragging = false;
+        root.classList.remove('sidebar-resizing');
+        try { handle.releasePointerCapture(e.pointerId); } catch (err) {}
+    };
+    handle.addEventListener('pointerup', stopDrag);
+    handle.addEventListener('pointercancel', stopDrag);
+}
+
 function bindCommonEvents() {
     document.querySelectorAll('.tab-btn').forEach(btn => {
         if (btn.dataset.bound === '1') return;
@@ -267,6 +322,8 @@ function bindCommonEvents() {
             loadData();
         });
     });
+
+    bindOpportunityFilters();
 
     if (detailSearch && !detailSearch.dataset.bound) {
         detailSearch.dataset.bound = '1';
@@ -363,6 +420,43 @@ function bindCommonEvents() {
     bindSubmit('form-fav', window.saveFav || saveFav);
 
     bindConfirmButtons();
+}
+
+
+function bindOpportunityFilters() {
+    const trackFilter = $('track-filter');
+    if (trackFilter && trackFilter.dataset.bound !== '1') {
+        trackFilter.dataset.bound = '1';
+        trackFilter.querySelectorAll('.filter-tab').forEach(btn => {
+            btn.addEventListener('click', () => {
+                trackFilter.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                state.track = btn.dataset.value || 'all';
+                loadOpps();
+            });
+        });
+    }
+
+    ['filter-priority', 'filter-region', 'filter-status', 'filter-action'].forEach(id => {
+        const el = $(id);
+        if (!el || el.dataset.bound === '1') return;
+        el.dataset.bound = '1';
+        el.addEventListener('change', () => loadOpps());
+    });
+
+    const clearBtn = $('btn-clear-search');
+    if (clearBtn && clearBtn.dataset.bound !== '1') {
+        clearBtn.dataset.bound = '1';
+        clearBtn.addEventListener('click', () => {
+            state.search = '';
+            if (searchBox) searchBox.value = '';
+            ['filter-priority', 'filter-region', 'filter-status', 'filter-action'].forEach(id => {
+                const el = $(id);
+                if (el) el.value = '';
+            });
+            loadOpps();
+        });
+    }
 }
 
 function bindClick(id, handler) {
@@ -599,10 +693,15 @@ function renderHomeOverview() {
    ============================================================ */
 function favoriteForOpp(opp) {
     if (!opp || !Array.isArray(state.favorites)) return null;
-    return state.favorites.find(f =>
-        (f.opportunity_id && String(f.opportunity_id) === String(opp.id)) ||
-        (!f.opportunity_id && f.opportunity_name === opp.name)
-    ) || null;
+    const oppId = String(opp.id || '');
+    const oppName = String(opp.name || '').trim();
+    return state.favorites.find(f => {
+        const favOppId = f.opportunity_id === null || f.opportunity_id === undefined ? '' : String(f.opportunity_id);
+        const favOppName = String(f.opportunity_name || '').trim();
+        const favJobName = String(f.job_name || '').trim();
+        return (favOppId && favOppId === oppId) ||
+               (!favOppId && oppName && (favOppName === oppName || favJobName === oppName));
+    }) || null;
 }
 
 async function favoriteOpp(id) {
@@ -614,11 +713,16 @@ async function favoriteOpp(id) {
         btn.textContent = '收藏中...';
     }
     try {
-        await fetchJson(`/api/opportunities/${id}/favorite`, {
+        const result = await fetchJson(`/api/opportunities/${id}/favorite`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ opportunity_id: id }),
         });
+        if (result.favorite) {
+            state.favorites = (state.favorites || []).filter(f => String(f.opportunity_id || '') !== String(id));
+            state.favorites.push(result.favorite);
+            renderOpps();
+        }
         await loadData();
     } catch (err) {
         console.error(err);

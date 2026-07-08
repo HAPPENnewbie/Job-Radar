@@ -493,3 +493,262 @@ a.btn,
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+
+/* ============================================================
+   2026-07 UI Feedback Fix
+   - 浅色侧边栏 + 可拖拽宽度
+   - 机会卡片固定合理宽度，避免单卡占满整行
+   - 浅色系按钮，降低塑料感
+   ============================================================ */
+:root {
+    --sidebar-w: 232px;
+    --sidebar-collapsed-w: 72px;
+    --sidebar-min-w: 196px;
+    --sidebar-max-w: 340px;
+    --soft-blue: #eff6ff;
+    --soft-indigo: #eef2ff;
+    --soft-cyan: #ecfeff;
+    --soft-green: #f0fdf4;
+    --soft-amber: #fffbeb;
+    --soft-red: #fef2f2;
+    --soft-purple: #f5f3ff;
+}
+
+body {
+    background:
+        radial-gradient(circle at 10% 0%, rgba(99, 102, 241, .10), transparent 28%),
+        radial-gradient(circle at 88% 6%, rgba(14, 165, 233, .10), transparent 30%),
+        linear-gradient(180deg, #fbfdff 0%, #f7f9fc 44%, #f5f7fb 100%);
+}
+
+/* 浅色侧边栏 */
+.sidebar {
+    width: var(--sidebar-w) !important;
+    overflow-x: hidden !important;
+    background:
+        radial-gradient(circle at 0% 0%, rgba(219, 234, 254, .88), transparent 32%),
+        linear-gradient(180deg, rgba(248, 250, 252, .98) 0%, rgba(241, 245, 249, .98) 100%) !important;
+    border-right: 1px solid rgba(203, 213, 225, .72) !important;
+    box-shadow: 10px 0 30px rgba(15, 23, 42, .08) !important;
+}
+.sidebar::before {
+    background: linear-gradient(135deg, rgba(255,255,255,.68), transparent 45%, rgba(224,242,254,.42)) !important;
+}
+.sidebar-header {
+    min-height: 64px !important;
+    padding: 14px 16px !important;
+    border-bottom: 1px solid rgba(203, 213, 225, .68) !important;
+}
+.sidebar-header h2 {
+    color: #1e293b !important;
+    font-size: 1rem !important;
+    font-weight: 800 !important;
+    letter-spacing: -.01em !important;
+}
+.sidebar-toggle {
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 13px !important;
+    color: #475569 !important;
+    background: rgba(255,255,255,.72) !important;
+    border: 1px solid rgba(148, 163, 184, .36) !important;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, .08), inset 0 1px 0 rgba(255,255,255,.78) !important;
+}
+.sidebar-toggle:hover {
+    color: #1d4ed8 !important;
+    background: #ffffff !important;
+    border-color: rgba(96, 165, 250, .42) !important;
+    box-shadow: 0 12px 24px rgba(59, 130, 246, .13), inset 0 1px 0 rgba(255,255,255,.88) !important;
+}
+.sidebar-nav {
+    flex: 0 0 auto !important;
+    padding: 10px 10px 6px !important;
+}
+.nav-item {
+    min-height: 40px !important;
+    margin: 3px 0 !important;
+    padding: 8px 12px !important;
+    color: #64748b !important;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    border-radius: 14px !important;
+    box-shadow: none !important;
+}
+.nav-item:hover {
+    color: #2563eb !important;
+    background: rgba(255,255,255,.74) !important;
+    border-color: rgba(191, 219, 254, .72) !important;
+    transform: translateX(2px) !important;
+    box-shadow: 0 8px 18px rgba(30, 64, 175, .08) !important;
+}
+.nav-item.active {
+    color: #1d4ed8 !important;
+    background: linear-gradient(135deg, #eef2ff 0%, #e0f2fe 100%) !important;
+    border-color: rgba(147, 197, 253, .72) !important;
+    box-shadow: 0 10px 24px rgba(37, 99, 235, .12), inset 0 1px 0 rgba(255,255,255,.86) !important;
+}
+.nav-icon {
+    flex-basis: 22px !important;
+    width: 22px !important;
+    font-size: 1.02rem !important;
+}
+.nav-text {
+    font-size: .9rem !important;
+    font-weight: 720 !important;
+    color: inherit !important;
+}
+.sidebar-footer {
+    margin-top: 8px !important;
+    padding: 10px 16px 14px !important;
+    border-top: 1px solid rgba(203, 213, 225, .62) !important;
+}
+.footer-text {
+    color: #94a3b8 !important;
+}
+
+/* 侧边栏宽度拖拽手柄 */
+.sidebar-resizer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 8px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 4;
+    opacity: 0;
+    transition: opacity var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+.sidebar:hover .sidebar-resizer,
+.sidebar-resizer:hover,
+html.sidebar-resizing .sidebar-resizer {
+    opacity: 1;
+    background: linear-gradient(180deg, transparent, rgba(59,130,246,.22), transparent);
+}
+html.sidebar-resizing,
+html.sidebar-resizing * {
+    user-select: none !important;
+    cursor: col-resize !important;
+}
+html.sidebar-collapsed .sidebar-resizer { display: none !important; }
+@media (max-width: 1024px) { .sidebar-resizer { display: none !important; } }
+html.sidebar-collapsed .sidebar { width: var(--sidebar-collapsed-w) !important; }
+html.sidebar-collapsed .main-content { width: calc(100% - var(--sidebar-collapsed-w)) !important; margin-left: var(--sidebar-collapsed-w) !important; }
+
+/* 浅色系按钮 */
+.btn,
+button.btn,
+a.btn,
+.btn-file-label {
+    min-height: 36px;
+    border-radius: 14px;
+    font-weight: 740;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, .05) !important;
+}
+.btn-sm { min-height: 32px; padding: 7px 11px; border-radius: 12px; font-size: .8rem; }
+.btn:hover { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(15, 23, 42, .08) !important; }
+.btn-primary {
+    color: #1d4ed8 !important;
+    background: #eff6ff !important;
+    border-color: #bfdbfe !important;
+}
+.btn-secondary {
+    color: #475569 !important;
+    background: rgba(255,255,255,.86) !important;
+    border-color: #dbe3ee !important;
+}
+.btn-success {
+    color: #166534 !important;
+    background: #f0fdf4 !important;
+    border-color: #bbf7d0 !important;
+}
+.btn-warning {
+    color: #92400e !important;
+    background: #fffbeb !important;
+    border-color: #fde68a !important;
+}
+.btn-danger {
+    color: #991b1b !important;
+    background: #fef2f2 !important;
+    border-color: #fecaca !important;
+}
+.btn-favorited {
+    color: #6d28d9 !important;
+    background: #f5f3ff !important;
+    border-color: #ddd6fe !important;
+}
+.btn-favorited::before { color: #7c3aed; }
+
+/* 机会管理筛选按钮 */
+.filter-tab,
+.tab-btn {
+    background: rgba(255,255,255,.82) !important;
+    color: #64748b !important;
+    border-color: #dbe3ee !important;
+    box-shadow: 0 3px 10px rgba(15, 23, 42, .04) !important;
+}
+.filter-tab.active,
+.tab-btn.active {
+    color: #1d4ed8 !important;
+    background: #eff6ff !important;
+    border-color: #bfdbfe !important;
+    box-shadow: 0 8px 18px rgba(37,99,235,.10) !important;
+}
+
+/* 机会列表：单卡不再铺满整行 */
+#opp-list.card-grid,
+#opp-list {
+    grid-template-columns: repeat(auto-fill, minmax(390px, 520px)) !important;
+    justify-content: start !important;
+    align-items: start !important;
+    gap: 14px !important;
+}
+#opp-list .opp-card {
+    max-width: 520px;
+    width: 100%;
+    padding: 14px 15px 13px !important;
+    gap: 8px !important;
+    border-radius: 17px !important;
+}
+#opp-list .opp-card-title { font-size: 1.04rem !important; }
+#opp-list .opp-card-meta {
+    font-size: .88rem !important;
+    gap: 4px 12px !important;
+}
+#opp-list .opp-card-timeline,
+#opp-list .compact-timeline-box {
+    padding: 9px 10px !important;
+    border-radius: 13px !important;
+}
+#opp-list .opp-card-actions {
+    gap: 7px !important;
+}
+#opp-list .tag,
+#opp-list .badge {
+    min-height: 22px;
+    padding: 4px 8px;
+    font-size: .72rem;
+}
+.opp-card-links:empty,
+.fav-card-links:empty {
+    display: none;
+}
+
+/* 顶部区块和工具栏更紧凑 */
+.section { padding: 15px 16px !important; margin-bottom: 16px !important; }
+.toolbar { padding: 12px !important; gap: 10px !important; }
+.search-input, .filter-select, .filter-input { min-height: 38px !important; }
+
+@media (max-width: 1180px) {
+    #opp-list.card-grid,
+    #opp-list { grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)) !important; }
+}
+@media (max-width: 900px) {
+    #opp-list.card-grid,
+    #opp-list { grid-template-columns: 1fr !important; }
+    #opp-list .opp-card { max-width: none; }
+}
+@media (max-width: 1024px) {
+    .sidebar { width: var(--sidebar-w) !important; }
+    .main-content,
+    html.sidebar-collapsed .main-content { width: 100% !important; margin-left: 0 !important; }
+}
