@@ -1,89 +1,290 @@
 {% extends "base.html" %}
 
-{% block title %}设置 - 2027届机会看板{% endblock %}
+{% block title %}设置 - {{ app_settings.app_name }}{% endblock %}
 
 {% block page_title %}设置{% endblock %}
-{% block page_desc %}配置个人信息和偏好设置{% endblock %}
+{% block page_desc %}配置个人信息、时间线范围、默认筛选和界面偏好{% endblock %}
 
 {% block content %}
-    <!-- ========== 个人背景 ========== -->
+<form id="settings-form" class="settings-form">
+    <section class="section">
+        <div class="section-header-row">
+            <h2 class="section-title">应用设置</h2>
+            <span id="settings-save-status" class="setting-status">未保存</span>
+        </div>
+        <div class="settings-grid">
+            <div class="form-group">
+                <label>应用名称</label>
+                <input type="text" id="setting-app-name" name="app_name" placeholder="就业雷达">
+            </div>
+            <div class="form-group">
+                <label>届别</label>
+                <input type="text" id="setting-grad-year" name="grad_year" placeholder="2027届">
+            </div>
+        </div>
+    </section>
+
     <section class="section">
         <h2 class="section-title">我的基本背景</h2>
-        <div class="settings-content">
-            <div class="setting-item">
-                <div class="setting-label">学校</div>
-                <div class="setting-value">xx大学</div>
+        <div class="settings-grid">
+            <div class="form-group">
+                <label>学校</label>
+                <input type="text" id="setting-school" name="school">
             </div>
-            <div class="setting-item">
-                <div class="setting-label">学历</div>
-                <div class="setting-value">2027届硕士研究生</div>
+            <div class="form-group">
+                <label>学历</label>
+                <input type="text" id="setting-education" name="education">
             </div>
-            <div class="setting-item">
-                <div class="setting-label">专业</div>
-                <div class="setting-value">计算机技术 / 计算机类</div>
+            <div class="form-group">
+                <label>专业</label>
+                <input type="text" id="setting-major" name="major">
             </div>
-            <div class="setting-item">
-                <div class="setting-label">本科</div>
-                <div class="setting-value">计算机科学与技术</div>
+            <div class="form-group">
+                <label>本科专业</label>
+                <input type="text" id="setting-undergraduate-major" name="undergraduate_major">
             </div>
         </div>
     </section>
 
-    <!-- ========== 地域目标 ========== -->
     <section class="section">
         <h2 class="section-title">地域目标</h2>
-        <div class="settings-content">
-            <div class="setting-item">
-                <div class="setting-label">第一优先</div>
-                <div class="setting-value">衡阳</div>
+        <div class="settings-grid">
+            <div class="form-group">
+                <label>第一优先</label>
+                <input type="text" id="setting-target-region-1" name="target_region_1">
             </div>
-            <div class="setting-item">
-                <div class="setting-label">第二优先</div>
-                <div class="setting-value">湖南省内</div>
+            <div class="form-group">
+                <label>第二优先</label>
+                <input type="text" id="setting-target-region-2" name="target_region_2">
             </div>
-            <div class="setting-item">
-                <div class="setting-label">第三优先</div>
-                <div class="setting-value">全国稳定机会</div>
+            <div class="form-group">
+                <label>第三优先</label>
+                <input type="text" id="setting-target-region-3" name="target_region_3">
             </div>
-            <div class="setting-item">
-                <div class="setting-label">备选路线</div>
-                <div class="setting-value">互联网 / 市场化就业</div>
+            <div class="form-group">
+                <label>备选路线</label>
+                <input type="text" id="setting-backup-route" name="backup_route">
             </div>
         </div>
     </section>
 
-    <!-- ========== 时间线范围 ========== -->
     <section class="section">
         <h2 class="section-title">时间线范围</h2>
-        <div class="settings-content">
-            <div class="setting-item">
-                <div class="setting-label">起始时间</div>
-                <div class="setting-value">2026年7月</div>
+        <div class="settings-grid">
+            <div class="form-group">
+                <label>起始月份</label>
+                <input type="month" id="setting-timeline-start" name="timeline_start">
             </div>
-            <div class="setting-item">
-                <div class="setting-label">结束时间</div>
-                <div class="setting-value">2027年12月</div>
+            <div class="form-group">
+                <label>结束月份</label>
+                <input type="month" id="setting-timeline-end" name="timeline_end">
             </div>
-            <div class="setting-item">
-                <div class="setting-label">总时长</div>
-                <div class="setting-value">18个月</div>
+            <div class="form-group">
+                <label>当前跨度</label>
+                <input type="text" id="setting-timeline-total" disabled>
             </div>
         </div>
-        <p class="setting-note">💡 如需修改时间线范围，请在 <code>static/js/app.js</code> 中修改 <code>TL_START</code>、<code>TL_END</code>、<code>TL_TOTAL</code> 常量。</p>
+        <p class="setting-note">保存后，时间日历和横向时间线会按这里的起止月份展示。改动后建议刷新页面。</p>
     </section>
 
-    <!-- ========== 后续计划 ========== -->
     <section class="section">
-        <h2 class="section-title">后续计划</h2>
-        <div class="settings-content">
-            <p class="setting-desc">以下功能计划在后续版本中添加：</p>
-            <ul class="setting-list">
-                <li>我的报考画像：记录适合的岗位类型、要求、薪资范围等</li>
-                <li>默认筛选条件：设置常用的筛选组合</li>
-                <li>信息源监控：配置关注的官网和公告链接</li>
-                <li>岗位表导入：支持从 Excel 批量导入岗位信息</li>
-                <li>提醒设置：配置重要节点的提醒时间</li>
-            </ul>
+        <h2 class="section-title">默认筛选</h2>
+        <div class="settings-grid">
+            <div class="form-group">
+                <label>默认机会大类</label>
+                <select id="setting-default-track" name="default_track">
+                    <option value="all">全部</option>
+                    <option value="体制/准体制">体制 / 准体制</option>
+                    <option value="互联网/市场化">互联网 / 市场化</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>默认优先级</label>
+                <select id="setting-default-priority" name="default_priority">
+                    <option value="">全部</option>
+                    <option value="重点关注">重点关注</option>
+                    <option value="可以关注">可以关注</option>
+                    <option value="低频关注">低频关注</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>待办默认范围</label>
+                <select id="setting-default-todo-range" name="default_todo_range">
+                    <option value="7d">近7天</option>
+                    <option value="30d">近30天</option>
+                    <option value="90d">近90天</option>
+                    <option value="all">全部</option>
+                </select>
+            </div>
         </div>
     </section>
+
+    <section class="section">
+        <h2 class="section-title">界面偏好</h2>
+        <div class="settings-content">
+            <label class="setting-checkline">
+                <input type="checkbox" id="setting-sidebar-collapsed" name="sidebar_default_collapsed">
+                默认收起侧边栏
+            </label>
+            <p class="setting-note">也可以直接点击左侧栏顶部的 ☰ 按钮临时展开/收起；该临时状态会保存在浏览器本地。</p>
+        </div>
+    </section>
+
+    <section class="section">
+        <h2 class="section-title">备注</h2>
+        <div class="form-group">
+            <textarea id="setting-note" name="note" rows="4" placeholder="记录自己的筛选原则、求职偏好或使用说明"></textarea>
+        </div>
+    </section>
+
+    <div class="settings-actions sticky-actions">
+        <button type="submit" class="btn btn-primary">保存设置</button>
+        <button type="button" id="btn-reset-settings" class="btn btn-secondary">恢复默认设置</button>
+        <button type="button" id="btn-clear-sidebar-cache" class="btn btn-secondary">清除侧边栏本地状态</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const $s = (id) => document.getElementById(id);
+    const fieldMap = {
+        app_name: 'setting-app-name',
+        grad_year: 'setting-grad-year',
+        school: 'setting-school',
+        education: 'setting-education',
+        major: 'setting-major',
+        undergraduate_major: 'setting-undergraduate-major',
+        target_region_1: 'setting-target-region-1',
+        target_region_2: 'setting-target-region-2',
+        target_region_3: 'setting-target-region-3',
+        backup_route: 'setting-backup-route',
+        timeline_start: 'setting-timeline-start',
+        timeline_end: 'setting-timeline-end',
+        default_track: 'setting-default-track',
+        default_priority: 'setting-default-priority',
+        default_todo_range: 'setting-default-todo-range',
+        note: 'setting-note'
+    };
+
+    function setStatus(text, kind) {
+        const el = $s('settings-save-status');
+        if (!el) return;
+        el.textContent = text;
+        el.className = 'setting-status ' + (kind || '');
+    }
+
+    function monthTotal(start, end) {
+        if (!start || !end) return '';
+        const [sy, sm] = start.split('-').map(Number);
+        const [ey, em] = end.split('-').map(Number);
+        const total = (ey - sy) * 12 + (em - sm) + 1;
+        return total > 0 ? `${total}个月` : '结束月份不能早于起始月份';
+    }
+
+    function updateTimelineTotal() {
+        const start = $s('setting-timeline-start')?.value || '';
+        const end = $s('setting-timeline-end')?.value || '';
+        const total = $s('setting-timeline-total');
+        if (total) total.value = monthTotal(start, end);
+    }
+
+    function fillForm(settings) {
+        Object.entries(fieldMap).forEach(([key, id]) => {
+            const el = $s(id);
+            if (el) el.value = settings[key] || '';
+        });
+        const collapsed = $s('setting-sidebar-collapsed');
+        if (collapsed) collapsed.checked = !!settings.sidebar_default_collapsed;
+        updateTimelineTotal();
+        setStatus('已加载', 'ok');
+    }
+
+    function readForm() {
+        const data = {};
+        Object.entries(fieldMap).forEach(([key, id]) => {
+            const el = $s(id);
+            if (el) data[key] = el.value.trim ? el.value.trim() : el.value;
+        });
+        data.sidebar_default_collapsed = !!$s('setting-sidebar-collapsed')?.checked;
+        return data;
+    }
+
+    async function loadSettings() {
+        try {
+            const resp = await fetch('/api/settings');
+            const result = await resp.json();
+            if (!resp.ok || result.ok === false) throw new Error(result.error || '加载失败');
+            window.JOB_RADAR_SETTINGS = result.settings || {};
+            fillForm(result.settings || {});
+        } catch (err) {
+            console.error(err);
+            setStatus('加载失败', 'error');
+        }
+    }
+
+    async function saveSettings(e) {
+        e.preventDefault();
+        const data = readForm();
+        if (data.timeline_start && data.timeline_end && data.timeline_end < data.timeline_start) {
+            alert('结束月份不能早于起始月份');
+            return;
+        }
+        setStatus('保存中...', 'saving');
+        try {
+            const resp = await fetch('/api/settings', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            const result = await resp.json().catch(() => ({}));
+            if (!resp.ok || result.ok === false) {
+                alert(result.error || '保存失败');
+                setStatus('保存失败', 'error');
+                return;
+            }
+            window.JOB_RADAR_SETTINGS = result.settings || data;
+            setStatus('已保存，刷新后全局生效', 'ok');
+            setTimeout(() => window.location.reload(), 500);
+        } catch (err) {
+            console.error(err);
+            alert('保存失败');
+            setStatus('保存失败', 'error');
+        }
+    }
+
+    async function resetSettings() {
+        if (!confirm('确认恢复默认设置？')) return;
+        try {
+            const resp = await fetch('/api/settings/reset', {method: 'POST'});
+            const result = await resp.json();
+            if (!resp.ok || result.ok === false) throw new Error(result.error || '恢复失败');
+            fillForm(result.settings || {});
+            setStatus('已恢复默认，刷新后全局生效', 'ok');
+            setTimeout(() => window.location.reload(), 500);
+        } catch (err) {
+            console.error(err);
+            alert('恢复默认失败');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const form = $s('settings-form');
+        if (form) form.addEventListener('submit', saveSettings);
+        const resetBtn = $s('btn-reset-settings');
+        if (resetBtn) resetBtn.addEventListener('click', resetSettings);
+        const clearSidebarBtn = $s('btn-clear-sidebar-cache');
+        if (clearSidebarBtn) clearSidebarBtn.addEventListener('click', () => {
+            try { localStorage.removeItem('jrSidebarCollapsed'); } catch (e) {}
+            alert('已清除侧边栏本地状态，刷新后按设置页默认值生效。');
+        });
+        ['setting-timeline-start', 'setting-timeline-end'].forEach(id => {
+            const el = $s(id);
+            if (el) el.addEventListener('change', updateTimelineTotal);
+        });
+        loadSettings();
+    });
+})();
+</script>
 {% endblock %}

@@ -47,7 +47,145 @@
         @media (max-width: 720px) {
             .jr-time-picker-row { grid-template-columns: 1fr; }
         }
+
+
+        /* ========== 侧边栏收缩 + 分屏适配 ========== */
+        :root {
+            --jr-sidebar-expanded: 240px;
+            --jr-sidebar-collapsed: 72px;
+        }
+        .sidebar,
+        .main-content {
+            transition: width .18s ease, margin-left .18s ease, transform .2s ease;
+        }
+        .sidebar-toggle {
+            display: inline-flex !important;
+            width: 32px;
+            height: 32px;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            border: 1px solid var(--c-border, #e5e7eb);
+            background: var(--c-card, #fff);
+        }
+        html.sidebar-collapsed .sidebar {
+            width: var(--jr-sidebar-collapsed);
+        }
+        html.sidebar-collapsed .main-content {
+            margin-left: var(--jr-sidebar-collapsed);
+        }
+        html.sidebar-collapsed .sidebar-header {
+            justify-content: center;
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+        html.sidebar-collapsed .sidebar-header h2,
+        html.sidebar-collapsed .nav-text,
+        html.sidebar-collapsed .sidebar-footer {
+            display: none !important;
+        }
+        html.sidebar-collapsed .sidebar-nav .nav-item {
+            justify-content: center;
+            padding-left: 0;
+            padding-right: 0;
+        }
+        html.sidebar-collapsed .nav-icon {
+            font-size: 1.25rem;
+        }
+        .main-content,
+        .page-content,
+        .section,
+        .toolbar,
+        .toolbar-left,
+        .toolbar-right {
+            min-width: 0;
+        }
+        .main-content {
+            overflow-x: hidden;
+        }
+        .page-content {
+            max-width: 100%;
+        }
+        .toolbar,
+        .toolbar-left,
+        .toolbar-right,
+        .filter-group,
+        .opp-card-actions,
+        .timeline-actions,
+        .fav-card-actions {
+            flex-wrap: wrap;
+        }
+        .card-grid {
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+        }
+        .calendar-grid {
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+        }
+        .modal-content {
+            max-width: min(920px, calc(100vw - 24px));
+        }
+        .table-wrap,
+        .event-list,
+        .todo-list {
+            max-width: 100%;
+            overflow-x: auto;
+        }
+        @media (max-width: 1024px) {
+            html.sidebar-collapsed .main-content { margin-left: 0; }
+            html.sidebar-collapsed .sidebar {
+                width: var(--jr-sidebar-expanded);
+                transform: translateX(-100%);
+            }
+            html.sidebar-collapsed .sidebar.open { transform: translateX(0); }
+            html.sidebar-collapsed .sidebar-header h2,
+            html.sidebar-collapsed .nav-text,
+            html.sidebar-collapsed .sidebar-footer {
+                display: block !important;
+            }
+            html.sidebar-collapsed .sidebar-nav .nav-item {
+                justify-content: flex-start;
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+        }
+        @media (max-width: 720px) {
+            .form-row,
+            .fav-card-meta,
+            .opp-card-meta {
+                grid-template-columns: 1fr !important;
+            }
+            .toolbar {
+                align-items: stretch;
+            }
+            .toolbar-left,
+            .toolbar-right {
+                width: 100%;
+            }
+            .todo-item {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+        }
     </style>
+
+    <script id="jr-settings-data" type="application/json">{{ app_settings|tojson }}</script>
+    <script>
+        window.JOB_RADAR_SETTINGS = {};
+        (function () {
+            try {
+                const settingsEl = document.getElementById('jr-settings-data');
+                if (settingsEl) {
+                    window.JOB_RADAR_SETTINGS = JSON.parse(settingsEl.textContent || '{}');
+                }
+                const saved = localStorage.getItem('jrSidebarCollapsed');
+                const fromSetting = !!(window.JOB_RADAR_SETTINGS && window.JOB_RADAR_SETTINGS.sidebar_default_collapsed);
+                const collapsed = saved === null ? fromSetting : saved === '1';
+                if (collapsed) document.documentElement.classList.add('sidebar-collapsed');
+            } catch (e) {
+                window.JOB_RADAR_SETTINGS = {};
+            }
+        })();
+    </script>
 </head>
 <body>
 
@@ -55,7 +193,7 @@
 
     <aside class="sidebar">
         <div class="sidebar-header">
-            <h2>🧙‍♀️  就业雷达</h2>
+            <h2>🧙‍♀️  {{ app_settings.app_name }}</h2>
             <button class="sidebar-toggle" id="sidebar-toggle">☰</button>
         </div>
         <nav class="sidebar-nav">
@@ -82,8 +220,8 @@
             </a>
         </nav>
         <div class="sidebar-footer">
-            <div class="footer-text">2027届</div>
-            <div class="footer-text">计算机硕士</div>
+            <div class="footer-text">{{ app_settings.grad_year }}</div>
+            <div class="footer-text">{{ app_settings.major }}</div>
         </div>
     </aside>
 
@@ -492,6 +630,27 @@
 <div id="tl-tooltip" class="tl-tooltip"></div>
 
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+
+<script>
+(function () {
+    document.addEventListener('DOMContentLoaded', function () {
+        const btn = document.getElementById('sidebar-toggle');
+        if (!btn || btn.dataset.collapseBound === '1') return;
+        btn.dataset.collapseBound = '1';
+        btn.setAttribute('title', '展开/收起侧边栏');
+        btn.addEventListener('click', function (e) {
+            if (window.innerWidth <= 1024) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const root = document.documentElement;
+            root.classList.toggle('sidebar-collapsed');
+            try {
+                localStorage.setItem('jrSidebarCollapsed', root.classList.contains('sidebar-collapsed') ? '1' : '0');
+            } catch (err) {}
+        }, true);
+    });
+})();
+</script>
 <script>
 (function () {
     const TIME_RE_MONTH = /^\d{4}-\d{2}$/;
@@ -675,7 +834,7 @@
             opportunity_id: opp.id
         };
         try {
-            const resp = await fetch('/api/job-favorites', {
+            const resp = await fetch(`/api/opportunities/${id}/favorite`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
@@ -699,7 +858,7 @@
         if (!fav) return;
         showConfirm(`确认取消收藏「${opp.name}」？`, async () => {
             try {
-                const resp = await fetch(`/api/job-favorites/${fav.id}`, { method: 'DELETE' });
+                const resp = await fetch(`/api/opportunities/${id}/favorite`, { method: 'DELETE' });
                 if (!resp.ok) throw new Error('取消收藏失败');
                 await loadData();
             } catch (err) {

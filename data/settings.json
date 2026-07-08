@@ -1,0 +1,19 @@
+{
+  "app_name": "就业雷达",
+  "grad_year": "2027届",
+  "school": "xx大学",
+  "education": "硕士研究生",
+  "major": "计算机技术 / 计算机类",
+  "undergraduate_major": "计算机科学与技术",
+  "target_region_1": "衡阳",
+  "target_region_2": "湖南省内",
+  "target_region_3": "全国稳定机会",
+  "backup_route": "互联网 / 市场化就业",
+  "timeline_start": "2026-07",
+  "timeline_end": "2027-07",
+  "default_todo_range": "90d",
+  "default_track": "all",
+  "default_priority": "",
+  "sidebar_default_collapsed": false,
+  "note": ""
+}

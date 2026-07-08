@@ -6,17 +6,15 @@
 {% block page_desc %}按月份查看公告、报名、笔试、面试节点{% endblock %}
 
 {% block content %}
-    <!-- ========== 工具栏 ========== -->
     <div class="toolbar">
         <div class="toolbar-left">
-            <p style="font-size:0.85rem;color:var(--c-text-3);margin:0;">点击月份查看该月详情，点击节点可编辑或删除。</p>
+            <p style="font-size:0.85rem;color:var(--c-text-3);margin:0;">点击月份查看该月详情，点击节点可查看、编辑或删除。</p>
         </div>
         <div class="toolbar-right">
             <button id="btn-add-event" class="btn btn-primary">+ 新增节点</button>
         </div>
     </div>
 
-    <!-- ========== 筛选工具栏 ========== -->
     <div class="toolbar" style="margin-top: 12px;">
         <div class="toolbar-left">
             <select id="calendar-filter-opportunity" class="filter-select">
@@ -48,15 +46,13 @@
         </div>
     </div>
 
-    <!-- ========== 日历网格 ========== -->
     <section class="section">
-        <h2 class="section-title">2026-2027 年度日历</h2>
+        <h2 class="section-title" id="calendar-range-title">年度日历</h2>
         <div id="calendar-grid" class="calendar-grid">
             <p class="placeholder">加载中...</p>
         </div>
     </section>
 
-    <!-- ========== 月份详情（点击月份后显示） ========== -->
     <section id="month-detail-section" class="section" style="display: none;">
         <div class="detail-header">
             <h2 class="section-title" id="month-detail-title">月份详情</h2>
@@ -65,11 +61,10 @@
         <div id="month-detail-content"></div>
     </section>
 
-    <!-- ========== 节点列表（辅助查看） ========== -->
     <section class="section">
         <div class="detail-list-header">
             <h3 class="section-title">所有节点列表</h3>
-            <input type="text" id="detail-search" class="detail-search" placeholder="搜索节点标题/类别...">
+            <input type="text" id="detail-search" class="detail-search" placeholder="搜索节点标题/类别/机会名称...">
         </div>
         <div id="event-list" class="event-list">
             <p class="placeholder">加载中...</p>
@@ -81,6 +76,7 @@
 <script>
 const calendarState = {
     events: [],
+    opportunities: [],
     currentMonth: null,
     filterTrack: '',
     filterStatus: '',
@@ -89,6 +85,30 @@ const calendarState = {
 };
 
 const escapeHtml = esc;
+
+
+function getCalendarRange() {
+    const cfg = window.JOB_RADAR_SETTINGS || {};
+    const start = /^\d{4}-\d{2}$/.test(cfg.timeline_start || '') ? cfg.timeline_start : '2026-07';
+    const end = /^\d{4}-\d{2}$/.test(cfg.timeline_end || '') ? cfg.timeline_end : '2027-12';
+    return end >= start ? {start, end} : {start: end, end: start};
+}
+
+function iterCalendarMonths() {
+    const {start, end} = getCalendarRange();
+    const [sy, sm] = start.split('-').map(Number);
+    const [ey, em] = end.split('-').map(Number);
+    const months = [];
+    let y = sy;
+    let m = sm;
+    while (y < ey || (y === ey && m <= em)) {
+        months.push({year: y, monthNum: m, month: `${y}-${String(m).padStart(2, '0')}`});
+        m += 1;
+        if (m > 12) { m = 1; y += 1; }
+        if (months.length > 120) break;
+    }
+    return months;
+}
 
 function getStatusClass(status) {
     const classMap = {
@@ -100,7 +120,6 @@ function getStatusClass(status) {
     };
     return classMap[status] || '';
 }
-
 function getStatusBadgeClass(status) {
     const classMap = {
         '官方已确定': 'badge-success',
@@ -111,21 +130,20 @@ function getStatusBadgeClass(status) {
     };
     return classMap[status] || 'badge-secondary';
 }
-
 function getTrackBadgeClass(track) {
     if ((track || '').includes('体制')) return 'badge-primary';
     if ((track || '').includes('互联网')) return 'badge-info';
     return 'badge-secondary';
 }
-
+function eventDateLabel(e) {
+    let text = e.event_date || e.date || e.month || '';
+    if (e.end_date) text += ` 至 ${e.end_date}`;
+    return text;
+}
 function getFilteredCalendarEvents() {
     let events = calendarState.events.slice();
-    if (calendarState.filterTrack) {
-        events = events.filter(e => e.track === calendarState.filterTrack);
-    }
-    if (calendarState.filterStatus) {
-        events = events.filter(e => e.status === calendarState.filterStatus);
-    }
+    if (calendarState.filterTrack) events = events.filter(e => e.track === calendarState.filterTrack);
+    if (calendarState.filterStatus) events = events.filter(e => e.status === calendarState.filterStatus);
     if (calendarState.filterOpportunity) {
         if (calendarState.filterOpportunity === 'none') {
             events = events.filter(e => !e.opportunity_id);
@@ -133,9 +151,7 @@ function getFilteredCalendarEvents() {
             events = events.filter(e => String(e.opportunity_id) === String(calendarState.filterOpportunity));
         }
     }
-    if (calendarState.filterEventType) {
-        events = events.filter(e => e.event_type === calendarState.filterEventType);
-    }
+    if (calendarState.filterEventType) events = events.filter(e => e.event_type === calendarState.filterEventType);
     return events;
 }
 
@@ -146,9 +162,7 @@ async function loadCalendarEvents() {
         calendarState.events = await resp.json();
         renderCalendar();
         renderEventList();
-        if (calendarState.currentMonth) {
-            showMonthDetail(calendarState.currentMonth);
-        }
+        if (calendarState.currentMonth) showMonthDetail(calendarState.currentMonth);
     } catch (e) {
         console.error('加载时间线失败', e);
         const grid = document.getElementById('calendar-grid');
@@ -157,37 +171,20 @@ async function loadCalendarEvents() {
         if (list) list.innerHTML = '<p class="placeholder" style="color:#e74c3c;">加载失败，请刷新页面</p>';
     }
 }
-
 window.reloadCalendarData = loadCalendarEvents;
 
 function renderCalendar() {
     const grid = document.getElementById('calendar-grid');
     if (!grid) return;
 
-    const months = [];
-    for (let year = 2026; year <= 2027; year++) {
-        const startMonth = year === 2026 ? 7 : 1;
-        const endMonth = 12;
-        for (let month = startMonth; month <= endMonth; month++) {
-            const monthStr = `${year}-${String(month).padStart(2, '0')}`;
-            const monthEvents = calendarState.events.filter(e => e.month === monthStr);
-            let filteredEvents = monthEvents;
-            if (calendarState.filterTrack) {
-                filteredEvents = filteredEvents.filter(e => e.track === calendarState.filterTrack);
-            }
-            if (calendarState.filterStatus) {
-                filteredEvents = filteredEvents.filter(e => e.status === calendarState.filterStatus);
-            }
-            months.push({
-                month: monthStr,
-                year,
-                monthNum: month,
-                events: monthEvents,
-                filteredEvents,
-                eventCount: filteredEvents.length
-            });
-        }
-    }
+    const filteredAll = getFilteredCalendarEvents();
+    const range = getCalendarRange();
+    const rangeTitle = document.getElementById('calendar-range-title');
+    if (rangeTitle) rangeTitle.textContent = `${range.start} 至 ${range.end} 日历`;
+    const months = iterCalendarMonths().map(m => {
+        const filteredEvents = filteredAll.filter(e => e.month === m.month);
+        return {...m, filteredEvents, eventCount: filteredEvents.length};
+    });
 
     grid.innerHTML = months.map(m => `
         <div class="calendar-month" data-month="${m.month}">
@@ -199,7 +196,7 @@ function renderCalendar() {
                 ${m.filteredEvents.slice(0, 3).map(e => `
                     <div class="event-item ${getStatusClass(e.status)}" data-id="${e.id}">
                         <div class="event-title">${escapeHtml(e.title)}</div>
-                        <div class="event-meta">${escapeHtml(e.category)}</div>
+                        <div class="event-meta">${escapeHtml(e.event_type || '其他')} · ${escapeHtml(e.opportunity_name || e.category || '未关联机会')}</div>
                     </div>
                 `).join('')}
                 ${m.filteredEvents.length > 3 ? `<div class="event-more">+${m.filteredEvents.length - 3} 更多</div>` : ''}
@@ -211,7 +208,6 @@ function renderCalendar() {
     grid.querySelectorAll('.calendar-month').forEach(el => {
         el.addEventListener('click', () => showMonthDetail(el.dataset.month));
     });
-
     grid.querySelectorAll('.event-item').forEach(el => {
         el.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -230,12 +226,9 @@ function showMonthDetail(month) {
     const [year, monthNum] = month.split('-').map(Number);
     title.textContent = `${year}年${monthNum}月节点`;
 
-    let monthEvents = getFilteredCalendarEvents().filter(e => e.month === month);
-    monthEvents.sort((a, b) => {
-        const dateA = a.event_date || a.date || `${a.month}-01`;
-        const dateB = b.event_date || b.date || `${b.month}-01`;
-        return dateA.localeCompare(dateB);
-    });
+    const monthEvents = getFilteredCalendarEvents()
+        .filter(e => e.month === month)
+        .sort((a, b) => (a.event_date || a.date || `${a.month}-01`).localeCompare(b.event_date || b.date || `${b.month}-01`));
 
     if (monthEvents.length === 0) {
         content.innerHTML = '<p class="placeholder">该月暂无节点</p>';
@@ -252,8 +245,10 @@ function showMonthDetail(month) {
                             </div>
                         </div>
                         <div class="event-card-meta">
+                            <span>节点类型: ${escapeHtml(e.event_type || '其他')}</span>
+                            <span>关联机会: ${e.opportunity_name ? escapeHtml(e.opportunity_name) : '未关联机会'}</span>
                             <span>类别: ${escapeHtml(e.category)}</span>
-                            ${(e.event_date || e.date) ? `<span>日期: ${escapeHtml(e.event_date || e.date)}</span>` : ''}
+                            <span>时间: ${escapeHtml(eventDateLabel(e))}</span>
                             ${e.current_action ? `<span>动作: ${escapeHtml(e.current_action)}</span>` : ''}
                         </div>
                         ${e.note ? `<div class="event-card-note">${escapeHtml(e.note)}</div>` : ''}
@@ -268,7 +263,6 @@ function showMonthDetail(month) {
                 `).join('')}
             </div>
         `;
-
         content.querySelectorAll('.event-card').forEach(el => {
             el.addEventListener('click', (e) => {
                 if (e.target.tagName === 'BUTTON' || e.target.tagName === 'A') return;
@@ -276,7 +270,6 @@ function showMonthDetail(month) {
             });
         });
     }
-
     section.style.display = 'block';
     section.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -285,32 +278,24 @@ function renderEventList() {
     const list = document.getElementById('event-list');
     const search = document.getElementById('detail-search');
     if (!list) return;
-
     const query = search ? search.value.trim().toLowerCase() : '';
     let filteredEvents = getFilteredCalendarEvents();
-
     if (query) {
         filteredEvents = filteredEvents.filter(e =>
             (e.title || '').toLowerCase().includes(query) ||
             (e.category || '').toLowerCase().includes(query) ||
-            (e.note || '').toLowerCase().includes(query)
+            (e.note || '').toLowerCase().includes(query) ||
+            (e.opportunity_name || '').toLowerCase().includes(query)
         );
     }
-
-    filteredEvents.sort((a, b) => {
-        const dateA = a.event_date || a.date || `${a.month}-01`;
-        const dateB = b.event_date || b.date || `${b.month}-01`;
-        return dateA.localeCompare(dateB);
-    });
-
+    filteredEvents.sort((a, b) => (a.event_date || a.date || `${a.month}-01`).localeCompare(b.event_date || b.date || `${b.month}-01`));
     if (filteredEvents.length === 0) {
         list.innerHTML = '<p class="placeholder">暂无节点</p>';
         return;
     }
-
     list.innerHTML = filteredEvents.map(e => `
         <div class="event-list-item ${getStatusClass(e.status)}" data-id="${e.id}">
-            <div class="event-list-month">${escapeHtml(e.event_date || e.date || e.month)}</div>
+            <div class="event-list-month">${escapeHtml(eventDateLabel(e))}</div>
             <div class="event-list-content">
                 <div class="event-list-title">${escapeHtml(e.title)}</div>
                 <div class="event-list-meta">
@@ -325,7 +310,6 @@ function renderEventList() {
             </div>
         </div>
     `).join('');
-
     list.querySelectorAll('.event-list-item').forEach(el => {
         el.addEventListener('click', (e) => {
             if (e.target.tagName === 'BUTTON') return;
@@ -338,22 +322,20 @@ window.editEvent = function(id) {
     const event = calendarState.events.find(e => e.id === id);
     if (event) openEvModal(event);
 };
-
 window.deleteEvent = async function(id) {
     const event = calendarState.events.find(e => e.id === id);
     if (!event) return;
     if (!confirm(`确认删除节点「${event.title}」？`)) return;
-
     try {
         const resp = await fetch(`/api/timeline/${id}`, { method: 'DELETE' });
         if (!resp.ok) throw new Error('删除失败');
         await loadCalendarEvents();
+        if (typeof loadData === 'function') await loadData();
     } catch (e) {
         console.error('删除失败', e);
         alert('删除失败，请重试');
     }
 };
-
 window.setEventStatus = async function(id, status) {
     try {
         const resp = await fetch(`/api/timeline/${id}`, {
@@ -363,25 +345,22 @@ window.setEventStatus = async function(id, status) {
         });
         if (!resp.ok) throw new Error('更新失败');
         await loadCalendarEvents();
+        if (typeof loadData === 'function') await loadData();
     } catch (e) {
         console.error('更新失败', e);
         alert('更新失败，请重试');
     }
 };
-
 window.showEventDetail = function(id) {
     const event = calendarState.events.find(e => e.id === id) || state.tlAllEvents.find(e => e.id === id);
     if (!event) return;
-
     const modal = document.getElementById('tl-detail-modal');
     const title = document.getElementById('tl-detail-title');
     const body = document.getElementById('tl-detail-body');
     if (!modal || !title || !body) return;
-
     title.textContent = event.title;
     body.innerHTML = `
-        <div class="detail-field"><div class="detail-label">月份</div><div class="detail-value">${escapeHtml(event.month)}</div></div>
-        ${(event.event_date || event.date) ? `<div class="detail-field"><div class="detail-label">具体日期</div><div class="detail-value">${escapeHtml(event.event_date || event.date)}</div></div>` : ''}
+        <div class="detail-field"><div class="detail-label">时间</div><div class="detail-value">${escapeHtml(eventDateLabel(event))}</div></div>
         <div class="detail-field"><div class="detail-label">节点类型</div><div class="detail-value">${escapeHtml(event.event_type || '其他')}</div></div>
         <div class="detail-field"><div class="detail-label">类别</div><div class="detail-value">${escapeHtml(event.category)}</div></div>
         <div class="detail-field"><div class="detail-label">大类</div><div class="detail-value">${escapeHtml(event.track)}</div></div>
@@ -395,10 +374,33 @@ window.showEventDetail = function(id) {
             <button class="btn btn-success" onclick="setEventStatus(${event.id}, '官方已确定'); document.getElementById('tl-detail-modal').style.display='none'">标记已确定</button>
             <button class="btn btn-warning" onclick="setEventStatus(${event.id}, '待更新'); document.getElementById('tl-detail-modal').style.display='none'">标记待更新</button>
             <button class="btn btn-danger" onclick="deleteEvent(${event.id}); document.getElementById('tl-detail-modal').style.display='none'">删除</button>
-        </div>
-    `;
+        </div>`;
     modal.style.display = 'flex';
 };
+
+async function loadOpportunityOptions() {
+    const filterOpportunity = document.getElementById('calendar-filter-opportunity');
+    if (!filterOpportunity) return;
+    try {
+        const resp = await fetch('/api/opportunities');
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        calendarState.opportunities = await resp.json();
+        calendarState.opportunities.forEach(opp => {
+            const option = document.createElement('option');
+            option.value = opp.id;
+            option.textContent = `${opp.name} (${opp.category})`;
+            filterOpportunity.appendChild(option);
+        });
+        const urlParams = new URLSearchParams(window.location.search);
+        const oppId = urlParams.get('opportunity_id');
+        if (oppId) {
+            filterOpportunity.value = oppId;
+            calendarState.filterOpportunity = oppId;
+        }
+    } catch (e) {
+        console.error('加载机会列表失败', e);
+    }
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
     const closeDetailBtn = document.getElementById('btn-close-detail');
@@ -409,39 +411,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     const filterEventType = document.getElementById('calendar-filter-event-type');
     const clearFilterBtn = document.getElementById('btn-clear-filter');
 
-    if (closeDetailBtn) {
-        closeDetailBtn.addEventListener('click', () => {
-            const section = document.getElementById('month-detail-section');
-            if (section) section.style.display = 'none';
-            calendarState.currentMonth = null;
-        });
-    }
-
+    if (closeDetailBtn) closeDetailBtn.addEventListener('click', () => {
+        const section = document.getElementById('month-detail-section');
+        if (section) section.style.display = 'none';
+        calendarState.currentMonth = null;
+    });
     if (detailSearch) detailSearch.addEventListener('input', renderEventList);
-    if (filterTrack) filterTrack.addEventListener('change', (e) => {
-        calendarState.filterTrack = e.target.value;
-        renderCalendar();
-        renderEventList();
-        if (calendarState.currentMonth) showMonthDetail(calendarState.currentMonth);
-    });
-    if (filterStatus) filterStatus.addEventListener('change', (e) => {
-        calendarState.filterStatus = e.target.value;
-        renderCalendar();
-        renderEventList();
-        if (calendarState.currentMonth) showMonthDetail(calendarState.currentMonth);
-    });
-    if (filterOpportunity) filterOpportunity.addEventListener('change', (e) => {
-        calendarState.filterOpportunity = e.target.value;
-        renderCalendar();
-        renderEventList();
-        if (calendarState.currentMonth) showMonthDetail(calendarState.currentMonth);
-    });
-    if (filterEventType) filterEventType.addEventListener('change', (e) => {
-        calendarState.filterEventType = e.target.value;
-        renderCalendar();
-        renderEventList();
-        if (calendarState.currentMonth) showMonthDetail(calendarState.currentMonth);
-    });
+    if (filterTrack) filterTrack.addEventListener('change', e => { calendarState.filterTrack = e.target.value; renderCalendar(); renderEventList(); if (calendarState.currentMonth) showMonthDetail(calendarState.currentMonth); });
+    if (filterStatus) filterStatus.addEventListener('change', e => { calendarState.filterStatus = e.target.value; renderCalendar(); renderEventList(); if (calendarState.currentMonth) showMonthDetail(calendarState.currentMonth); });
+    if (filterOpportunity) filterOpportunity.addEventListener('change', e => { calendarState.filterOpportunity = e.target.value; renderCalendar(); renderEventList(); if (calendarState.currentMonth) showMonthDetail(calendarState.currentMonth); });
+    if (filterEventType) filterEventType.addEventListener('change', e => { calendarState.filterEventType = e.target.value; renderCalendar(); renderEventList(); if (calendarState.currentMonth) showMonthDetail(calendarState.currentMonth); });
     if (clearFilterBtn) clearFilterBtn.addEventListener('click', () => {
         calendarState.filterTrack = '';
         calendarState.filterStatus = '';
@@ -451,38 +430,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (filterStatus) filterStatus.value = '';
         if (filterOpportunity) filterOpportunity.value = '';
         if (filterEventType) filterEventType.value = '';
-        renderCalendar();
-        renderEventList();
-        if (calendarState.currentMonth) showMonthDetail(calendarState.currentMonth);
+        renderCalendar(); renderEventList(); if (calendarState.currentMonth) showMonthDetail(calendarState.currentMonth);
     });
 
-    // 先加载机会列表以填充机会筛选下拉框
-    try {
-        const resp = await fetch('/api/opportunities');
-        if (resp.ok) {
-            const opps = await resp.json();
-            if (filterOpportunity) {
-                opps.forEach(opp => {
-                    const option = document.createElement('option');
-                    option.value = opp.id;
-                    option.textContent = `${opp.name} (${opp.category})`;
-                    filterOpportunity.appendChild(option);
-                });
-            }
-
-            // 检查 URL 参数 opportunity_id
-            const urlParams = new URLSearchParams(window.location.search);
-            const oppId = urlParams.get('opportunity_id');
-            if (oppId && filterOpportunity) {
-                filterOpportunity.value = oppId;
-                calendarState.filterOpportunity = oppId;
-            }
-        }
-    } catch (e) {
-        console.error('加载机会列表失败', e);
-    }
-
-    loadCalendarEvents();
+    await loadOpportunityOptions();
+    await loadCalendarEvents();
 });
 </script>
 {% endblock %}

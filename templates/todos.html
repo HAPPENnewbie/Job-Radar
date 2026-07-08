@@ -3,10 +3,9 @@
 {% block title %}待办事项 - 2027届机会看板{% endblock %}
 
 {% block page_title %}待办事项{% endblock %}
-{% block page_desc %}查看近期需要处理的信息{% endblock %}
+{% block page_desc %}按时间范围、类型、动作筛选需要处理的机会、日历节点和岗位收藏{% endblock %}
 
 {% block content %}
-    <!-- ========== 筛选工具栏 ========== -->
     <div class="toolbar todo-filter-toolbar">
         <div class="toolbar-left">
             <div class="filter-group">
@@ -66,12 +65,8 @@
         </div>
     </div>
 
-    <!-- ========== 当前范围显示 ========== -->
-    <div id="todo-range-display" class="todo-range-display">
-        当前范围：近90天
-    </div>
+    <div id="todo-range-display" class="todo-range-display">当前范围：近90天</div>
 
-    <!-- ========== 待办视图 ========== -->
     <div id="todo-container">
         <p class="placeholder">加载中...</p>
     </div>
@@ -79,8 +74,9 @@
 
 {% block extra_js %}
 <script>
+const defaultTodoRange = (window.JOB_RADAR_SETTINGS && window.JOB_RADAR_SETTINGS.default_todo_range) || '90d';
 const todoState = {
-    range: '90d',
+    range: defaultTodoRange,
     type: 'all',
     action: 'all',
     status: 'all',
@@ -88,214 +84,176 @@ const todoState = {
     monthTo: ''
 };
 
-// 工具函数：从文本中提取月份
-function textTimeToMonth(text) {
-    if (!text) return null;
-    text = text.trim();
-
-    // 匹配 YYYY-MM-DD
-    const match1 = text.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
-    if (match1) {
-        return `${match1[1]}-${parseInt(match1[2]).toString().padStart(2, '0')}`;
-    }
-
-    // 匹配 YYYY-MM
-    const match2 = text.match(/(\d{4})-(\d{1,2})/);
-    if (match2) {
-        return `${match2[1]}-${parseInt(match2[2]).toString().padStart(2, '0')}`;
-    }
-
-    // "本月"
+function pad2(n) { return String(n).padStart(2, '0'); }
+function toMonth(date) { return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`; }
+function parseDay(value) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return null;
+    const [y, m, d] = value.split('-').map(Number);
+    return new Date(y, m - 1, d);
+}
+function parseMonthStart(value) {
+    if (!/^\d{4}-\d{2}$/.test(value || '')) return null;
+    const [y, m] = value.split('-').map(Number);
+    return new Date(y, m - 1, 1);
+}
+function parseMonthEnd(value) {
+    if (!/^\d{4}-\d{2}$/.test(value || '')) return null;
+    const [y, m] = value.split('-').map(Number);
+    return new Date(y, m, 0);
+}
+function parseTimeRanges(text) {
+    text = (text || '').trim();
+    if (!text) return [];
     if (text.includes('本月')) {
-        const now = new Date();
-        return `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+        const m = toMonth(new Date());
+        return [{ start: parseMonthStart(m), end: parseMonthEnd(m), month: m, raw: text }];
     }
-
-    return null;
+    const parts = text.split('~').map(s => s.trim()).filter(Boolean);
+    if (parts.length === 0 || parts.length > 2) return [];
+    const startRaw = parts[0];
+    const endRaw = parts[1] || parts[0];
+    let start = null;
+    let end = null;
+    let month = null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(startRaw)) {
+        start = parseDay(startRaw);
+        month = startRaw.slice(0, 7);
+    } else if (/^\d{4}-\d{2}$/.test(startRaw)) {
+        start = parseMonthStart(startRaw);
+        month = startRaw;
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(endRaw)) {
+        end = parseDay(endRaw);
+    } else if (/^\d{4}-\d{2}$/.test(endRaw)) {
+        end = parseMonthEnd(endRaw);
+    }
+    if (!start || !end) return [];
+    if (end < start) return [];
+    return [{ start, end, month, raw: text }];
 }
-
-// 工具函数：判断月份是否在范围内
-function monthInRange(month, rangeState) {
-    if (!month) return rangeState.range === 'all';
-
+function getTodoWindow() {
     const now = new Date();
-    const curMonth = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
-
-    if (rangeState.range === 'all') return true;
-
-    if (rangeState.range === 'custom') {
-        if (!rangeState.monthFrom || !rangeState.monthTo) return true;
-        return month >= rangeState.monthFrom && month <= rangeState.monthTo;
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (todoState.range === 'all') return null;
+    if (todoState.range === 'custom') {
+        if (!todoState.monthFrom || !todoState.monthTo) return null;
+        return {
+            start: parseMonthStart(todoState.monthFrom),
+            end: parseMonthEnd(todoState.monthTo)
+        };
     }
-
-    // 计算天数
-    let days;
-    if (rangeState.range === '7d') days = 7;
-    else if (rangeState.range === '30d') days = 30;
-    else if (rangeState.range === '90d') days = 90;
-    else return true;
-
-    const [y, m] = month.split('-').map(Number);
-    const [cy, cm] = curMonth.split('-').map(Number);
-
-    // 粗略比较：月份差
-    const monthDiff = (y - cy) * 12 + (m - cm);
-    const maxMonths = Math.ceil(days / 30);
-
-    return monthDiff >= -1 && monthDiff <= maxMonths;
+    const days = todoState.range === '7d' ? 7 : todoState.range === '30d' ? 30 : 90;
+    return {
+        start: today,
+        end: new Date(today.getTime() + days * 24 * 60 * 60 * 1000)
+    };
 }
-
-// 工具函数：判断项目是否匹配筛选条件
-function itemMatchesTodoFilters(item, type, action, status) {
-    if (type !== 'all') {
-        if (type === 'opp' && item._type !== 'opp') return false;
-        if (type === 'event' && item._type !== 'event') return false;
-        if (type === 'fav' && item._type !== 'fav') return false;
+function rangesOverlap(aStart, aEnd, bStart, bEnd) {
+    if (!aStart || !aEnd || !bStart || !bEnd) return false;
+    return aStart <= bEnd && aEnd >= bStart;
+}
+function timeTextInRange(text) {
+    const ranges = parseTimeRanges(text);
+    if (ranges.length === 0) return todoState.range === 'all';
+    const win = getTodoWindow();
+    if (!win) return true;
+    return ranges.some(r => rangesOverlap(r.start, r.end, win.start, win.end));
+}
+function eventInRange(ev) {
+    const startRaw = ev.event_date || ev.date || ev.month || '';
+    const endRaw = ev.end_date || startRaw;
+    const value = endRaw && endRaw !== startRaw ? `${startRaw}~${endRaw}` : startRaw;
+    return timeTextInRange(value);
+}
+function itemMatchesTodoFilters(item, type) {
+    if (todoState.type !== 'all' && type !== todoState.type) return false;
+    if (todoState.action !== 'all' && (item.current_action || '') !== todoState.action) return false;
+    if (todoState.status !== 'all') {
+        if (type === 'fav') return false;
+        if ((item.status || '') !== todoState.status) return false;
     }
-
-    if (action !== 'all') {
-        if (item.current_action !== action) return false;
-    }
-
-    if (status !== 'all') {
-        if (item.status !== status) return false;
-    }
-
     return true;
 }
-
 function getRangeLabel() {
     if (todoState.range === 'custom') {
-        if (todoState.monthFrom && todoState.monthTo) {
-            return `自定义：${todoState.monthFrom} 至 ${todoState.monthTo}`;
-        }
-        return '自定义范围（未设置）';
+        return todoState.monthFrom && todoState.monthTo
+            ? `自定义：${todoState.monthFrom} 至 ${todoState.monthTo}`
+            : '自定义范围（未设置时显示全部）';
     }
-    const labels = {
-        '7d': '近7天',
-        '30d': '近30天',
-        '90d': '近90天',
-        'all': '全部'
-    };
-    return labels[todoState.range] || '近90天';
+    return { '7d': '近7天', '30d': '近30天', '90d': '近90天', all: '全部' }[todoState.range] || '近90天';
+}
+function oppHasTimeInRange(o) {
+    return [
+        o.expected_announcement_time,
+        o.expected_apply_time,
+        o.expected_exam_time,
+        o.expected_interview_time
+    ].some(timeTextInRange);
+}
+function favHasTimeInRange(f) {
+    return [f.apply_time, f.exam_time, f.interview_time].some(timeTextInRange);
 }
 
 function renderTodoView() {
     const todoContainer = document.getElementById('todo-container');
     const rangeDisplay = document.getElementById('todo-range-display');
     if (!todoContainer) return;
+    if (rangeDisplay) rangeDisplay.textContent = `当前范围：${getRangeLabel()}`;
 
-    if (rangeDisplay) {
-        rangeDisplay.textContent = `当前范围：${getRangeLabel()}`;
-    }
-
-    const opps = state.opps;
-    const events = state.tlAllEvents;
-    const favs = state.favorites;
-
-    // 根据时间范围筛选
-    const filteredEvents = events.filter(e => {
-        return monthInRange(e.month, todoState);
-    });
-
-    const filteredOpps = opps.filter(o => {
-        // 机会的时间字段包括公告、报名、笔试、面试
-        const times = [
-            textTimeToMonth(o.expected_announcement_time),
-            textTimeToMonth(o.expected_apply_time),
-            textTimeToMonth(o.expected_exam_time),
-            textTimeToMonth(o.expected_interview_time)
-        ].filter(Boolean);
-
-        // 如果机会没有任何可解析的时间，则在"全部"范围下显示
-        if (times.length === 0) return todoState.range === 'all';
-
-        // 只要有一个时间在范围内就显示
-        return times.some(t => monthInRange(t, todoState));
-    });
-
-    const filteredFavs = favs.filter(f => {
-        const times = [
-            textTimeToMonth(f.apply_time),
-            textTimeToMonth(f.exam_time),
-            textTimeToMonth(f.interview_time)
-        ].filter(Boolean);
-
-        if (times.length === 0) return todoState.range === 'all';
-        return times.some(t => monthInRange(t, todoState));
-    });
-
-    // 按类型、动作、状态进一步筛选
-    const matchType = todoState.type;
-    const matchAction = todoState.action;
-    const matchStatus = todoState.status;
+    const existingOppIds = new Set((state.opps || []).map(o => String(o.id)));
+    const opps = state.opps || [];
+    const events = (state.tlAllEvents || []).filter(e => !e.opportunity_id || existingOppIds.has(String(e.opportunity_id)));
+    const favs = state.favorites || [];
 
     let html = '';
 
-    // 1. 近期日历节点
-    if (matchType === 'all' || matchType === 'event') {
-        let nodeItems = filteredEvents.filter(e =>
-            itemMatchesTodoFilters({...e, _type: 'event'}, matchType, matchAction, matchStatus)
-        );
-        nodeItems.sort((a, b) => {
-            const dateA = a.event_date || a.date || `${a.month}-01`;
-            const dateB = b.event_date || b.date || `${b.month}-01`;
-            return dateA.localeCompare(dateB);
-        });
-        html += renderTodoGroup('近期日历节点', nodeItems.map(e => ({...e, _type: 'event'})));
+    if (todoState.type === 'all' || todoState.type === 'event') {
+        const nodeItems = events
+            .filter(eventInRange)
+            .filter(e => itemMatchesTodoFilters(e, 'event'))
+            .sort((a, b) => (a.event_date || a.date || `${a.month}-01`).localeCompare(b.event_date || b.date || `${b.month}-01`));
+        html += renderTodoGroup('近期日历节点', nodeItems.map(e => ({ ...e, _type: 'event' })));
     }
 
-    // 2. 机会待处理
-    if (matchType === 'all' || matchType === 'opp') {
-        let oppItems = filteredOpps.filter(o =>
-            itemMatchesTodoFilters({...o, _type: 'opp'}, matchType, matchAction, matchStatus)
-        );
-        html += renderTodoGroup('机会待处理', oppItems.map(o => ({...o, _type: 'opp'})));
+    if (todoState.type === 'all' || todoState.type === 'opp') {
+        const actionSet = ['等公告', '等报名', '待报名', '待投递', '待笔试', '待面试'];
+        const oppItems = opps
+            .filter(o => oppHasTimeInRange(o) || actionSet.includes(o.current_action))
+            .filter(o => itemMatchesTodoFilters(o, 'opp'));
+        html += renderTodoGroup('机会待处理', oppItems.map(o => ({ ...o, _type: 'opp' })));
     }
 
-    // 3. 岗位收藏待处理
-    if (matchType === 'all' || matchType === 'fav') {
-        let favItems = filteredFavs.filter(f => {
-            // 岗位收藏的待处理条件：动作是待确认/待报名/待投递/待笔试/待面试
-            const pendingActions = ['待确认', '待报名', '待投递', '待笔试', '待面试'];
-            const isPending = pendingActions.includes(f.current_action);
-            const matchesFilters = itemMatchesTodoFilters({...f, _type: 'fav'}, matchType, matchAction, matchStatus);
-            return isPending && matchesFilters;
-        });
-        html += renderTodoGroup('岗位收藏待处理', favItems.map(f => ({...f, _type: 'fav'})));
+    if (todoState.type === 'all' || todoState.type === 'fav') {
+        const pendingActions = ['待确认', '待报名', '待投递', '待笔试', '待面试'];
+        const favItems = favs
+            .filter(f => pendingActions.includes(f.current_action) || favHasTimeInRange(f))
+            .filter(f => itemMatchesTodoFilters(f, 'fav'));
+        html += renderTodoGroup('岗位收藏待处理', favItems.map(f => ({ ...f, _type: 'fav' })));
     }
 
-    // 4. 过期待更新（不受时间范围限制，但受其他筛选限制）
-    if (matchType === 'all' || matchType === 'opp') {
+    if (todoState.type === 'all' || todoState.type === 'opp') {
         const overdueItems = opps.filter(o => {
             const isOverdue = (o.status === '参考往年' || o.status === '待更新') &&
-                (o.current_action === '等公告' || o.current_action === '等报名' ||
-                 o.current_action === '待投递' || o.current_action === '待笔试' ||
-                 o.current_action === '待面试');
-            return isOverdue && itemMatchesTodoFilters({...o, _type: 'opp'}, matchType, matchAction, matchStatus);
+                ['等公告', '等报名', '待投递', '待笔试', '待面试'].includes(o.current_action);
+            return isOverdue && itemMatchesTodoFilters(o, 'opp') && (todoState.range === 'all' || oppHasTimeInRange(o));
         });
-        html += renderTodoGroup('过期待更新', overdueItems.map(o => ({...o, _type: 'opp'})));
+        html += renderTodoGroup('过期待更新', overdueItems.map(o => ({ ...o, _type: 'opp' })));
     }
 
-    // 5. 待确认链接（不受时间范围限制，但受其他筛选限制）
-    if (matchType === 'all' || matchType === 'opp') {
+    if (todoState.type === 'all' || todoState.type === 'opp') {
         const noLinkOpps = opps.filter(o => {
             const noLink = !o.official_url && !o.announcement_url && !o.position_url;
-            return noLink && itemMatchesTodoFilters({...o, _type: 'opp'}, matchType, matchAction, matchStatus);
+            return noLink && itemMatchesTodoFilters(o, 'opp') && (todoState.range === 'all' || oppHasTimeInRange(o));
         });
-        html += renderTodoGroup('待确认链接', noLinkOpps.map(o => ({...o, _type: 'opp'})));
+        html += renderTodoGroup('待确认链接', noLinkOpps.map(o => ({ ...o, _type: 'opp' })));
     }
 
     todoContainer.innerHTML = html || '<p class="todo-empty">暂无待处理事项</p>';
 }
 
 function renderTodoGroup(title, items) {
-    if (items.length === 0) return '';
-
-    let html = `<div class="todo-group">
-        <div class="todo-group-title">${esc(title)} <span class="todo-group-badge">${items.length}</span></div>
-        <div class="todo-list">`;
-
+    if (!items || items.length === 0) return '';
+    let html = `<div class="todo-group"><div class="todo-group-title">${esc(title)} <span class="todo-group-badge">${items.length}</span></div><div class="todo-list">`;
     items.forEach(item => {
         if (item._type === 'event') {
             html += `
@@ -304,15 +262,14 @@ function renderTodoGroup(title, items) {
                         <div class="todo-item-title">${esc(item.title)}</div>
                         <div class="todo-item-meta">
                             <span class="event-type-badge">${esc(item.event_type || '其他')}</span>
-                            <span>${esc(item.month)}</span>
+                            <span>${esc(item.event_date || item.date || item.month)}</span>
                             <span>${esc(item.category)}</span>
-                            ${item.opportunity_name ? `<span>🔗 ${esc(item.opportunity_name)}</span>` : ''}
+                            ${item.end_date ? `<span>至 ${esc(item.end_date)}</span>` : ''}
+                            ${item.opportunity_name ? `<span>🔗 ${esc(item.opportunity_name)}</span>` : '<span>未关联机会</span>'}
                             ${statusTag(item.status)}
                         </div>
                     </div>
-                    <div class="todo-item-actions">
-                        <button class="btn btn-sm btn-secondary" onclick="showTlDetail(${item.id})">查看</button>
-                    </div>
+                    <div class="todo-item-actions"><button class="btn btn-sm btn-secondary" onclick="showTlDetail(${item.id})">查看</button></div>
                 </div>`;
         } else if (item._type === 'fav') {
             html += `
@@ -323,6 +280,7 @@ function renderTodoGroup(title, items) {
                             <span>${esc(item.opportunity_name)}</span>
                             <span>${esc(item.current_action)}</span>
                             ${matchStatusTag(item.match_status)}
+                            ${item.apply_time ? `<span>报名：${esc(formatTimeValue ? formatTimeValue(item.apply_time) : item.apply_time)}</span>` : ''}
                         </div>
                     </div>
                     <div class="todo-item-actions">
@@ -339,6 +297,7 @@ function renderTodoGroup(title, items) {
                             <span>${esc(item.category)}</span>
                             <span>${esc(item.current_action)}</span>
                             ${statusTag(item.status)}
+                            ${item.expected_apply_time ? `<span>报名：${esc(formatTimeValue ? formatTimeValue(item.expected_apply_time) : item.expected_apply_time)}</span>` : ''}
                         </div>
                     </div>
                     <div class="todo-item-actions">
@@ -348,8 +307,7 @@ function renderTodoGroup(title, items) {
                 </div>`;
         }
     });
-
-    html += `</div></div>`;
+    html += '</div></div>';
     return html;
 }
 
@@ -364,73 +322,43 @@ document.addEventListener('DOMContentLoaded', () => {
     const clearBtn = document.getElementById('todo-clear-filter');
 
     if (rangeTabs) {
+        rangeTabs.querySelectorAll('.filter-tab').forEach(b => {
+            b.classList.toggle('active', b.dataset.value === todoState.range);
+        });
+        if (customRange) customRange.style.display = todoState.range === 'custom' ? 'flex' : 'none';
         rangeTabs.addEventListener('click', (e) => {
             const btn = e.target.closest('.filter-tab');
             if (!btn) return;
             rangeTabs.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             todoState.range = btn.dataset.value;
-
-            if (todoState.range === 'custom') {
-                customRange.style.display = 'flex';
-            } else {
-                customRange.style.display = 'none';
-            }
+            if (customRange) customRange.style.display = todoState.range === 'custom' ? 'flex' : 'none';
             renderTodoView();
         });
     }
-
-    if (monthFrom) {
-        monthFrom.addEventListener('change', () => {
-            todoState.monthFrom = monthFrom.value;
-            renderTodoView();
-        });
-    }
-
-    if (monthTo) {
-        monthTo.addEventListener('change', () => {
-            todoState.monthTo = monthTo.value;
-            renderTodoView();
-        });
-    }
-
-    if (typeFilter) {
-        typeFilter.addEventListener('change', () => {
-            todoState.type = typeFilter.value;
-            renderTodoView();
-        });
-    }
-
-    if (actionFilter) {
-        actionFilter.addEventListener('change', () => {
-            todoState.action = actionFilter.value;
-            renderTodoView();
-        });
-    }
-
-    if (statusFilter) {
-        statusFilter.addEventListener('change', () => {
-            todoState.status = statusFilter.value;
-            renderTodoView();
-        });
-    }
-
-    if (clearBtn) {
-        clearBtn.addEventListener('click', () => {
-            todoState.type = 'all';
-            todoState.action = 'all';
-            todoState.status = 'all';
-            if (typeFilter) typeFilter.value = 'all';
-            if (actionFilter) actionFilter.value = 'all';
-            if (statusFilter) statusFilter.value = 'all';
-            renderTodoView();
-        });
-    }
-
-    // 初始加载数据后渲染
-    if (typeof loadData === 'function') {
-        loadData().then(() => renderTodoView());
-    }
+    if (monthFrom) monthFrom.addEventListener('change', () => { todoState.monthFrom = monthFrom.value; renderTodoView(); });
+    if (monthTo) monthTo.addEventListener('change', () => { todoState.monthTo = monthTo.value; renderTodoView(); });
+    if (typeFilter) typeFilter.addEventListener('change', () => { todoState.type = typeFilter.value; renderTodoView(); });
+    if (actionFilter) actionFilter.addEventListener('change', () => { todoState.action = actionFilter.value; renderTodoView(); });
+    if (statusFilter) statusFilter.addEventListener('change', () => { todoState.status = statusFilter.value; renderTodoView(); });
+    if (clearBtn) clearBtn.addEventListener('click', () => {
+        todoState.range = defaultTodoRange;
+        todoState.type = 'all';
+        todoState.action = 'all';
+        todoState.status = 'all';
+        todoState.monthFrom = '';
+        todoState.monthTo = '';
+        if (typeFilter) typeFilter.value = 'all';
+        if (actionFilter) actionFilter.value = 'all';
+        if (statusFilter) statusFilter.value = 'all';
+        if (monthFrom) monthFrom.value = '';
+        if (monthTo) monthTo.value = '';
+        if (customRange) customRange.style.display = todoState.range === 'custom' ? 'flex' : 'none';
+        if (rangeTabs) {
+            rangeTabs.querySelectorAll('.filter-tab').forEach(b => b.classList.toggle('active', b.dataset.value === defaultTodoRange));
+        }
+        renderTodoView();
+    });
 });
 </script>
 {% endblock %}

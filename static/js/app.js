@@ -2,13 +2,9 @@
    全局状态
    ============================================================ */
 const state = {
-    track: 'all',
+    track: (window.JOB_RADAR_SETTINGS && window.JOB_RADAR_SETTINGS.default_track) || 'all',
     filter: '',
     search: '',
-    priority: '',
-    region: '',
-    status: '',
-    action: '',
     opps: [],
     events: [],
     tlAllEvents: [],
@@ -16,9 +12,16 @@ const state = {
 };
 
 /* 时间线配置 */
-const TL_START = '2026-07';
-const TL_END = '2027-12';
-const TL_TOTAL = 18;
+const JR_SETTINGS = window.JOB_RADAR_SETTINGS || {};
+const TL_START = JR_SETTINGS.timeline_start || '2026-07';
+const TL_END = JR_SETTINGS.timeline_end || '2027-12';
+function monthDiffInclusiveForAxis(start, end) {
+    const [sy, sm] = String(start || '2026-07').split('-').map(Number);
+    const [ey, em] = String(end || '2027-12').split('-').map(Number);
+    const diff = (ey - sy) * 12 + (em - sm);
+    return Number.isFinite(diff) && diff > 0 ? diff : 1;
+}
+const TL_TOTAL = monthDiffInclusiveForAxis(TL_START, TL_END);
 const AXIS_Y = 140;
 
 /* DOM 引用 */
@@ -127,11 +130,9 @@ function actionTag(a) {
 /* 从当前 filter / search 推导 API 查询参数 */
 function buildOppParams() {
     const params = new URLSearchParams();
-
-    if (state.track && state.track !== 'all') params.set('track', state.track);
+    if (state.track !== 'all') params.set('track', state.track);
     if (state.search) params.set('q', state.search);
 
-    /* 兼容旧版单下拉筛选 */
     if (state.filter) {
         const [key, val] = state.filter.split(':');
         if (key === 'track')    params.set('track', val);
@@ -141,173 +142,7 @@ function buildOppParams() {
         if (key === 'status')   params.set('status', val);
         if (key === 'action')   params.set('current_action', val);
     }
-
-    /* 机会管理页面的多条件筛选 */
-    if (state.priority) params.set('priority', state.priority);
-    if (state.region)   params.set('region', state.region);
-    if (state.status)   params.set('status', state.status);
-    if (state.action)   params.set('current_action', state.action);
-
     return params;
-}
-
-function initOpportunityFilters() {
-    if (!oppList) return;
-
-    const trackFilter = $('track-filter');
-    const clearSearchBtn = $('btn-clear-search');
-    const filterPriority = $('filter-priority');
-    const filterRegion = $('filter-region');
-    const filterStatus = $('filter-status');
-    const filterAction = $('filter-action');
-
-    if (trackFilter) {
-        trackFilter.addEventListener('click', (e) => {
-            const btn = e.target.closest('.filter-tab');
-            if (!btn) return;
-            trackFilter.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            state.track = btn.dataset.value || 'all';
-            loadOpps();
-        });
-    }
-
-    if (clearSearchBtn && searchBox) {
-        clearSearchBtn.addEventListener('click', () => {
-            searchBox.value = '';
-            state.search = '';
-            loadOpps();
-        });
-    }
-
-    if (filterPriority) filterPriority.addEventListener('change', () => {
-        state.priority = filterPriority.value;
-        loadOpps();
-    });
-    if (filterRegion) filterRegion.addEventListener('change', () => {
-        state.region = filterRegion.value;
-        loadOpps();
-    });
-    if (filterStatus && oppList) filterStatus.addEventListener('change', () => {
-        state.status = filterStatus.value;
-        loadOpps();
-    });
-    if (filterAction) filterAction.addEventListener('change', () => {
-        state.action = filterAction.value;
-        loadOpps();
-    });
-}
-
-function renderDbInfo() {
-    const oppCountEl = $('db-opp-count');
-    const eventCountEl = $('db-event-count');
-    const favCountEl = $('db-fav-count');
-    if (!oppCountEl || !eventCountEl || !favCountEl) return;
-
-    oppCountEl.textContent = state.opps.length;
-    eventCountEl.textContent = state.tlAllEvents.length;
-    favCountEl.textContent = state.favorites.length;
-}
-
-function getActiveEvents() {
-    const existingOppIds = new Set(state.opps.map(o => String(o.id)));
-    return state.tlAllEvents.filter(e =>
-        !e.opportunity_id || existingOppIds.has(String(e.opportunity_id))
-    );
-}
-
-function renderHomeOverview() {
-    const recentNodesEl = $('recent-nodes');
-    const todoSummaryEl = $('todo-summary');
-    const lastUpdateEl = $('last-update');
-    const statOverdueEl = $('stat-overdue');
-
-    if (!recentNodesEl && !todoSummaryEl && !lastUpdateEl && !statOverdueEl) return;
-
-    const opps = state.opps;
-    const events = getActiveEvents();
-    const now = new Date();
-    const curMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-
-    if (lastUpdateEl) {
-        const all = [...opps, ...events];
-        const times = all.map(x => x.updated_at).filter(Boolean).sort().reverse();
-        lastUpdateEl.textContent = times.length ? times[0] : '-';
-    }
-
-    const overdueItems = opps.filter(o =>
-        (o.status === '参考往年' || o.status === '待更新') &&
-        (o.current_action === '等公告' || o.current_action === '等报名' ||
-         o.current_action === '待投递' || o.current_action === '待笔试' ||
-         o.current_action === '待面试')
-    );
-    if (statOverdueEl) statOverdueEl.textContent = overdueItems.length;
-
-    if (recentNodesEl) {
-        const upcoming = events
-            .filter(e => e.month >= curMonth)
-            .filter(e => e.status !== '已放弃')
-            .sort((a, b) => a.month.localeCompare(b.month))
-            .slice(0, 5);
-
-        if (upcoming.length === 0) {
-            recentNodesEl.innerHTML = '<p class="placeholder">暂无近期节点</p>';
-        } else {
-            recentNodesEl.innerHTML = upcoming.map(e => `
-                <div class="recent-node-item">
-                    <div class="recent-node-month">${esc(e.month)}</div>
-                    <div class="recent-node-content">
-                        <div class="recent-node-title">${esc(e.title)}</div>
-                        <div class="recent-node-meta">${esc(e.category)} ${statusTag(e.status)}</div>
-                    </div>
-                    <button class="btn btn-sm btn-secondary" onclick="showTlDetail(${e.id})">查看</button>
-                </div>
-            `).join('');
-        }
-    }
-
-    if (todoSummaryEl) {
-        const thisMonthOpps = opps.filter(o =>
-            o.current_action === '等公告' || o.current_action === '等报名'
-        );
-        const noLinkOpps = opps.filter(o =>
-            !o.official_url && !o.announcement_url && !o.position_url
-        );
-        const actionOpps = {
-            '待报名': opps.filter(o => o.current_action === '待报名'),
-            '待投递': opps.filter(o => o.current_action === '待投递'),
-            '待笔试': opps.filter(o => o.current_action === '待笔试'),
-            '待面试': opps.filter(o => o.current_action === '待面试'),
-        };
-
-        let html = `
-            <div class="todo-summary-item">
-                <div class="todo-summary-title">本月需关注 <span class="todo-summary-count">${thisMonthOpps.length}</span></div>
-                <a href="/todos" class="btn btn-sm btn-secondary">查看全部</a>
-            </div>
-            <div class="todo-summary-item">
-                <div class="todo-summary-title">过期待更新 <span class="todo-summary-count">${overdueItems.length}</span></div>
-                <a href="/todos" class="btn btn-sm btn-secondary">查看全部</a>
-            </div>
-            <div class="todo-summary-item">
-                <div class="todo-summary-title">待确认链接 <span class="todo-summary-count">${noLinkOpps.length}</span></div>
-                <a href="/todos" class="btn btn-sm btn-secondary">查看全部</a>
-            </div>
-        `;
-
-        for (const [action, items] of Object.entries(actionOpps)) {
-            if (items.length > 0) {
-                html += `
-                    <div class="todo-summary-item">
-                        <div class="todo-summary-title">${action} <span class="todo-summary-count">${items.length}</span></div>
-                        <a href="/todos" class="btn btn-sm btn-secondary">查看全部</a>
-                    </div>
-                `;
-            }
-        }
-
-        todoSummaryEl.innerHTML = html;
-    }
 }
 
 /* buildTlParams 已移除：时间线始终加载全部节点，不受筛选影响 */
@@ -379,9 +214,6 @@ function init() {
         showConfirm('确认重置为默认数据？当前数据将被全部清除。', resetData);
     });
 
-    /* 机会管理页面筛选 */
-    initOpportunityFilters();
-
     /* 岗位收藏搜索和筛选 */
     if (favSearch) {
         let favTimer;
@@ -418,9 +250,10 @@ function init() {
     });
 
     /* 表单提交 */
-    $('form-opp').addEventListener('submit', saveOpp);
-    if ($('form-event')) $('form-event').addEventListener('submit', saveEv);
+    if ($('form-opp')) $('form-opp').addEventListener('submit', saveOpp);
+    $('form-event').addEventListener('submit', saveEv);
     if ($('form-fav')) $('form-fav').addEventListener('submit', saveFav);
+    $('form-event').addEventListener('submit', saveEv);
 
     /* 初始加载 */
     loadData();
@@ -434,21 +267,16 @@ async function loadData() {
     updateSummary();
     renderStats();
     renderTodoView();
-    renderDbInfo();
-    renderHomeOverview();
 }
 
 async function loadOpps() {
     try {
         const resp = await fetch('/api/opportunities?' + buildOppParams());
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         state.opps = await resp.json();
         renderOpps();
     } catch (e) {
         console.error('加载机会失败', e);
-        if (oppList) {
-            oppList.innerHTML = '<p class="placeholder">加载失败，请刷新页面</p>';
-        }
+        oppList.innerHTML = '<p class="placeholder">加载失败，请刷新页面</p>';
     }
 }
 
@@ -456,17 +284,13 @@ async function loadTl() {
     try {
         /* 时间线始终加载全部节点，不受 track/filter 影响 */
         const resp = await fetch('/api/timeline');
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         state.tlAllEvents = await resp.json();
         state.events = state.tlAllEvents; /* 兼容 updateSummary */
         renderTimeline();
         renderDetailList();
     } catch (e) {
         console.error('加载时间线失败', e);
-        state.tlAllEvents = [];
-        state.events = [];
         if (tlTrack) tlTrack.innerHTML = '<p class="tl-empty">加载失败，请刷新页面</p>';
-        if (todoContainer) todoContainer.innerHTML = '<p class="placeholder">加载时间线失败，请刷新页面</p>';
     }
 }
 
@@ -474,8 +298,6 @@ async function loadTl() {
    顶部摘要
    ============================================================ */
 function updateSummary() {
-    if (!recentEl || !lastUpdEl) return;
-
     const now = new Date();
     const curMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
 
@@ -500,8 +322,6 @@ function updateSummary() {
    渲染：机会卡片
    ============================================================ */
 function renderOpps() {
-    if (!oppList || !oppCount) return;
-
     oppCount.textContent = state.opps.length;
 
     if (state.opps.length === 0) {
@@ -509,30 +329,7 @@ function renderOpps() {
         return;
     }
 
-    // 统计每条机会的时间线完整度
-    const timelineStats = {};
-    state.opps.forEach(opp => {
-        timelineStats[opp.id] = { types: new Set(), total: 0 };
-    });
-
-    state.tlAllEvents.forEach(ev => {
-        if (ev.opportunity_id && timelineStats[ev.opportunity_id]) {
-            if (ev.event_type) {
-                timelineStats[ev.opportunity_id].types.add(ev.event_type);
-            }
-            timelineStats[ev.opportunity_id].total++;
-        }
-    });
-
-    const coreTypes = ['公告', '报名/投递', '笔试/测评', '面试'];
-
-    oppList.innerHTML = state.opps.map(o => {
-        const stats = timelineStats[o.id] || { types: new Set(), total: 0 };
-        const hasTypes = stats.types;
-        const coreCount = coreTypes.filter(t => hasTypes.has(t)).length;
-        const missingTypes = coreTypes.filter(t => !hasTypes.has(t));
-
-        return `
+    oppList.innerHTML = state.opps.map(o => `
         <div class="opp-card" data-id="${o.id}">
             <div class="opp-card-header">
                 <h3 class="opp-card-title">${esc(o.name)}</h3>
@@ -554,18 +351,6 @@ function renderOpps() {
                 <div><span class="meta-key">面试：</span>${esc(o.expected_interview_time)}</div>
             </div>
 
-            <div class="opp-card-timeline">
-                <div class="timeline-completeness">
-                    <span class="meta-key">时间线：</span>
-                    <span class="timeline-count">${coreCount}/4</span>
-                    ${missingTypes.length > 0 ? `<span class="timeline-missing">缺少：${esc(missingTypes.join('、'))}</span>` : '<span class="timeline-complete">✓ 完整</span>'}
-                </div>
-                <div class="timeline-actions">
-                    <button class="btn btn-sm btn-primary" onclick="syncTimeline(${o.id})">同步时间线</button>
-                    <a href="/timeline?opportunity_id=${o.id}" class="btn btn-sm btn-secondary">查看日历</a>
-                </div>
-            </div>
-
             <div class="opp-card-links">
                 ${linkHtml(o.official_url, '官网')}
                 ${linkHtml(o.announcement_url, '公告')}
@@ -582,7 +367,7 @@ function renderOpps() {
                 <button class="btn btn-sm btn-danger" onclick="delOpp(${o.id})">删除</button>
             </div>
         </div>
-    `}).join('');
+    `).join('');
 }
 
 /* ============================================================
@@ -650,12 +435,18 @@ function trackDotClass(t) {
 /* 生成月份刻度列表 */
 function generateMonthTicks() {
     const months = [];
-    for (let y = 2026; y <= 2027; y++) {
-        const startM = (y === 2026) ? 7 : 1;
-        const endM = (y === 2027) ? 12 : 12;
-        for (let m = startM; m <= endM; m++) {
-            months.push(`${y}-${String(m).padStart(2, '0')}`);
-        }
+    let [sy, sm] = String(TL_START || '2026-07').split('-').map(Number);
+    const [ey, em] = String(TL_END || '2027-12').split('-').map(Number);
+    if (!Number.isFinite(sy) || !Number.isFinite(sm) || !Number.isFinite(ey) || !Number.isFinite(em)) {
+        sy = 2026; sm = 7;
+    }
+    let y = sy;
+    let m = sm;
+    while (y < ey || (y === ey && m <= em)) {
+        months.push(`${y}-${String(m).padStart(2, '0')}`);
+        m += 1;
+        if (m > 12) { m = 1; y += 1; }
+        if (months.length > 120) break;
     }
     return months;
 }
@@ -664,7 +455,7 @@ function renderTimeline() {
     if (!tlTrack) return;
 
     const events = state.tlAllEvents;
-    if (eventCount) eventCount.textContent = events.length;
+    eventCount.textContent = events.length;
 
     const months = generateMonthTicks();
     const curMonth = getCurrentMonth();
@@ -811,10 +602,9 @@ function scheduleHideTooltip() {
 
 /* 显示节点详情弹窗 */
 function showTlDetail(id) {
-    if (tlTooltip) tlTooltip.style.display = 'none';
+    tlTooltip.style.display = 'none';
     const ev = state.tlAllEvents.find(e => e.id === id);
     if (!ev) return;
-    if (!tlDetailModal || !tlDetailBody || !$('tl-detail-title')) return;
 
     $('tl-detail-title').textContent = ev.title;
 
@@ -846,12 +636,8 @@ function delEvFromDetail(id) {
     tlDetailModal.style.display = 'none';
     showConfirm(`确认删除「${ev.title}」？`, async () => {
         try {
-            const resp = await fetch(`/api/timeline/${id}`, { method: 'DELETE' });
-            if (!resp.ok) throw new Error('删除失败');
+            await fetch(`/api/timeline/${id}`, { method: 'DELETE' });
             await loadData();
-            if (typeof window.reloadCalendarData === 'function') {
-                await window.reloadCalendarData();
-            }
         } catch (err) {
             console.error(err);
             alert('删除失败');
@@ -952,16 +738,11 @@ async function saveOpp(e) {
     try {
         const url = id ? `/api/opportunities/${id}` : '/api/opportunities';
         const method = id ? 'PUT' : 'POST';
-        const resp = await fetch(url, {
+        await fetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
-        const result = await resp.json().catch(() => ({}));
-        if (!resp.ok) {
-            alert(result.error || '保存失败');
-            return;
-        }
         modalOpp.style.display = 'none';
         await loadData();
     } catch (err) {
@@ -978,17 +759,9 @@ function editOpp(id) {
 function delOpp(id) {
     const opp = state.opps.find(o => o.id === id);
     if (!opp) return;
-    showConfirm(`确认删除「${opp.name}」？相关时间线节点和岗位收藏也会同步删除。`, async () => {
+    showConfirm(`确认删除「${opp.name}」？`, async () => {
         try {
-            const resp = await fetch(`/api/opportunities/${id}`, { method: 'DELETE' });
-            const result = await resp.json().catch(() => ({}));
-
-            if (!resp.ok || result.ok === false) {
-                alert(result.error || '删除失败');
-                return;
-            }
-
-            console.log('删除同步结果：', result);
+            await fetch(`/api/opportunities/${id}`, { method: 'DELETE' });
             await loadData();
         } catch (err) {
             console.error(err);
@@ -1007,40 +780,6 @@ async function setOppStatus(id, status) {
         await loadData();
     } catch (err) {
         console.error(err);
-    }
-}
-
-async function syncTimeline(id) {
-    const opp = state.opps.find(o => o.id === id);
-    if (!opp) return;
-
-    try {
-        const resp = await fetch(`/api/opportunities/${id}/sync-timeline`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-        const result = await resp.json();
-
-        if (!resp.ok || result.ok === false) {
-            alert(result.error || '同步失败');
-            return;
-        }
-
-        let msg = `同步完成：\n`;
-        msg += `创建 ${result.created} 个节点\n`;
-        msg += `更新 ${result.updated} 个节点`;
-        if (result.skipped && result.skipped.length > 0) {
-            msg += `\n\n跳过 ${result.skipped.length} 个字段：`;
-            result.skipped.forEach(s => {
-                msg += `\n- ${s.field}: ${s.reason}`;
-            });
-        }
-        alert(msg);
-
-        await loadData();
-    } catch (err) {
-        console.error(err);
-        alert('同步失败');
     }
 }
 
@@ -1063,14 +802,10 @@ function openEvModal(ev) {
     $('event-date-precision').value = ev ? (ev.date_precision || 'month') : 'month';
     $('event-end-date').value = ev ? ev.end_date : '';
     $('event-current-action').value = ev ? ev.current_action : '';
-    $('event-type').value = ev ? (ev.event_type || '其他') : '其他';
+    $('event-opportunity-id').value = ev ? (ev.opportunity_id || '') : '';
 
-    // 填充关联机会下拉框（如果模板中存在该字段）
-    const eventOppSelect = $('event-opportunity-id');
-    if (eventOppSelect) {
-        eventOppSelect.value = ev ? (ev.opportunity_id || '') : '';
-        populateOpportunitySelect('event-opportunity-id', ev ? ev.opportunity_id : null);
-    }
+    // 填充关联机会下拉框
+    populateOpportunitySelect('event-opportunity-id', ev ? ev.opportunity_id : null);
 
     modalEv.style.display     = 'flex';
 }
@@ -1079,40 +814,20 @@ function populateOpportunitySelect(selectId, selectedId) {
     const select = $(selectId);
     if (!select) return;
 
+    // 清空现有选项（保留第一个"不关联"选项）
     select.innerHTML = '<option value="">不关联</option>';
 
+    // 添加所有机会
     state.opps.forEach(opp => {
         const option = document.createElement('option');
         option.value = opp.id;
         option.textContent = `${opp.name} (${opp.category})`;
-        if (selectedId && String(opp.id) === String(selectedId)) {
+        if (selectedId && opp.id === selectedId) {
             option.selected = true;
         }
         select.appendChild(option);
     });
-
-    /* 岗位收藏选择关联机会时，同步文本字段，避免 opportunity_id 和 opportunity_name 不一致 */
-    if (selectId === 'fav-opportunity-id' && !select.dataset.syncBound) {
-        select.dataset.syncBound = '1';
-        select.addEventListener('change', () => {
-            const opp = state.opps.find(o => String(o.id) === String(select.value));
-            if (!opp) return;
-            if ($('fav-opp-name')) $('fav-opp-name').value = opp.name || '';
-            if ($('fav-track')) $('fav-track').value = opp.track || '体制/准体制';
-        });
-    }
-
-    if (selectId === 'event-opportunity-id' && !select.dataset.syncBound) {
-        select.dataset.syncBound = '1';
-        select.addEventListener('change', () => {
-            const opp = state.opps.find(o => String(o.id) === String(select.value));
-            if (!opp) return;
-            if ($('event-track')) $('event-track').value = opp.track || '体制/准体制';
-            if ($('event-category')) $('event-category').value = opp.category || '';
-        });
-    }
 }
-
 
 async function saveEv(e) {
     e.preventDefault();
@@ -1131,8 +846,7 @@ async function saveEv(e) {
         date_precision: $('event-date-precision').value,
         end_date: $('event-end-date').value,
         current_action: $('event-current-action').value,
-        event_type: $('event-type').value || '其他',
-        opportunity_id: $('event-opportunity-id') ? ($('event-opportunity-id').value || null) : null,
+        opportunity_id: $('event-opportunity-id').value || null,
     };
     if (!data.month || !data.title) {
         alert('请填写月份和标题');
@@ -1142,21 +856,13 @@ async function saveEv(e) {
     try {
         const url = id ? `/api/timeline/${id}` : '/api/timeline';
         const method = id ? 'PUT' : 'POST';
-        const resp = await fetch(url, {
+        await fetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
-        const result = await resp.json().catch(() => ({}));
-        if (!resp.ok) {
-            alert(result.error || '保存失败');
-            return;
-        }
         modalEv.style.display = 'none';
         await loadData();
-        if (typeof window.reloadCalendarData === 'function') {
-            await window.reloadCalendarData();
-        }
     } catch (err) {
         console.error(err);
         alert('保存失败');
@@ -1173,12 +879,8 @@ function delEv(id) {
     if (!ev) return;
     showConfirm(`确认删除「${ev.title}」？`, async () => {
         try {
-            const resp = await fetch(`/api/timeline/${id}`, { method: 'DELETE' });
-            if (!resp.ok) throw new Error('删除失败');
+            await fetch(`/api/timeline/${id}`, { method: 'DELETE' });
             await loadData();
-            if (typeof window.reloadCalendarData === 'function') {
-                await window.reloadCalendarData();
-            }
         } catch (err) {
             console.error(err);
             alert('删除失败');
@@ -1188,19 +890,14 @@ function delEv(id) {
 
 async function setEvStatus(id, status) {
     try {
-        const resp = await fetch(`/api/timeline/${id}`, {
+        await fetch(`/api/timeline/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status })
         });
-        if (!resp.ok) throw new Error('更新失败');
         await loadData();
-        if (typeof window.reloadCalendarData === 'function') {
-            await window.reloadCalendarData();
-        }
     } catch (err) {
         console.error(err);
-        alert('更新失败');
     }
 }
 
@@ -1239,7 +936,7 @@ function handleImport() {
                 alert(result.error || '导入失败');
                 return;
             }
-            alert(`导入成功：${result.opp_count} 条机会，${result.event_count} 条时间节点，${result.fav_count || 0} 条岗位收藏`);
+            alert(`导入成功：${result.opp_count} 条机会，${result.event_count} 条时间节点`);
             await loadData();
         } catch (err) {
             console.error(err);
@@ -1269,28 +966,20 @@ async function resetData() {
    确认弹窗
    ============================================================ */
 function showConfirm(msg, cb) {
-    if (!confirmMsg || !confirmDlg) {
-        if (window.confirm(msg)) cb();
-        return;
-    }
     confirmMsg.textContent = msg;
     confirmCallback = cb;
     confirmDlg.style.display = 'flex';
 }
 
-if ($('confirm-yes')) {
-    $('confirm-yes').addEventListener('click', () => {
-        confirmDlg.style.display = 'none';
-        if (confirmCallback) { confirmCallback(); confirmCallback = null; }
-    });
-}
+$('confirm-yes').addEventListener('click', () => {
+    confirmDlg.style.display = 'none';
+    if (confirmCallback) { confirmCallback(); confirmCallback = null; }
+});
 
-if ($('confirm-no')) {
-    $('confirm-no').addEventListener('click', () => {
-        confirmDlg.style.display = 'none';
-        confirmCallback = null;
-    });
-}
+$('confirm-no').addEventListener('click', () => {
+    confirmDlg.style.display = 'none';
+    confirmCallback = null;
+});
 
 /* ============================================================
    岗位收藏
@@ -1298,7 +987,6 @@ if ($('confirm-no')) {
 async function loadFavorites() {
     try {
         const resp = await fetch('/api/job-favorites');
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         state.favorites = await resp.json();
         renderFavorites();
     } catch (e) {
@@ -1409,13 +1097,10 @@ function openFavModal(fav) {
     $('fav-priority').value = fav ? fav.priority : '可以关注';
     $('fav-action').value = fav ? fav.current_action : '待确认';
     $('fav-note').value = fav ? fav.note : '';
+    $('fav-opportunity-id').value = fav ? (fav.opportunity_id || '') : '';
 
-    // 填充关联机会下拉框（如果模板中存在该字段）
-    const favOppSelect = $('fav-opportunity-id');
-    if (favOppSelect) {
-        favOppSelect.value = fav ? (fav.opportunity_id || '') : '';
-        populateOpportunitySelect('fav-opportunity-id', fav ? fav.opportunity_id : null);
-    }
+    // 填充关联机会下拉框
+    populateOpportunitySelect('fav-opportunity-id', fav ? fav.opportunity_id : null);
 
     modalFav.style.display = 'flex';
 }
@@ -1440,7 +1125,7 @@ async function saveFav(e) {
         priority: $('fav-priority').value,
         current_action: $('fav-action').value,
         note: $('fav-note').value.trim(),
-        opportunity_id: $('fav-opportunity-id') ? ($('fav-opportunity-id').value || null) : null,
+        opportunity_id: $('fav-opportunity-id').value || null,
     };
 
     if (!data.job_name) {
@@ -1451,16 +1136,11 @@ async function saveFav(e) {
     try {
         const url = id ? `/api/job-favorites/${id}` : '/api/job-favorites';
         const method = id ? 'PUT' : 'POST';
-        const resp = await fetch(url, {
+        await fetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
-        const result = await resp.json().catch(() => ({}));
-        if (!resp.ok) {
-            alert(result.error || '保存失败');
-            return;
-        }
         modalFav.style.display = 'none';
         await loadFavorites();
     } catch (err) {
@@ -1479,13 +1159,8 @@ function delFav(id) {
     if (!fav) return;
     showConfirm(`确认删除岗位「${fav.job_name}」？`, async () => {
         try {
-            const resp = await fetch(`/api/job-favorites/${id}`, { method: 'DELETE' });
-            const result = await resp.json().catch(() => ({}));
-            if (!resp.ok || result.ok === false) {
-                alert(result.error || '删除失败');
-                return;
-            }
-            await loadData();
+            await fetch(`/api/job-favorites/${id}`, { method: 'DELETE' });
+            await loadFavorites();
         } catch (err) {
             console.error(err);
             alert('删除失败');
@@ -1511,13 +1186,8 @@ function exportFavorites() {
    统计卡片
    ============================================================ */
 function renderStats() {
-    if (!$('stat-total')) return;
-
     const opps = state.opps;
-    const existingOppIds = new Set(opps.map(o => String(o.id)));
-    const events = state.tlAllEvents.filter(e =>
-        !e.opportunity_id || existingOppIds.has(String(e.opportunity_id))
-    );
+    const events = state.tlAllEvents;
     const favs = state.favorites;
 
     /* 总数 */
@@ -1550,15 +1220,15 @@ function renderStats() {
     const reference = opps.filter(o => o.status === '参考往年').length;
     const abandoned = opps.filter(o => o.status === '已放弃').length;
 
-    if ($('status-confirmed')) $('status-confirmed').style.width = (confirmed / total * 100) + '%';
-    if ($('status-pending')) $('status-pending').style.width = (pending / total * 100) + '%';
-    if ($('status-reference')) $('status-reference').style.width = (reference / total * 100) + '%';
-    if ($('status-abandoned')) $('status-abandoned').style.width = (abandoned / total * 100) + '%';
+    $('status-confirmed').style.width = (confirmed / total * 100) + '%';
+    $('status-pending').style.width = (pending / total * 100) + '%';
+    $('status-reference').style.width = (reference / total * 100) + '%';
+    $('status-abandoned').style.width = (abandoned / total * 100) + '%';
 
-    if ($('legend-confirmed')) $('legend-confirmed').textContent = confirmed;
-    if ($('legend-pending')) $('legend-pending').textContent = pending;
-    if ($('legend-reference')) $('legend-reference').textContent = reference;
-    if ($('legend-abandoned')) $('legend-abandoned').textContent = abandoned;
+    $('legend-confirmed').textContent = confirmed;
+    $('legend-pending').textContent = pending;
+    $('legend-reference').textContent = reference;
+    $('legend-abandoned').textContent = abandoned;
 }
 
 /* ============================================================
@@ -1568,10 +1238,7 @@ function renderTodoView() {
     if (!todoContainer) return;
 
     const opps = state.opps;
-    const existingOppIds = new Set(opps.map(o => String(o.id)));
-    const events = state.tlAllEvents.filter(e =>
-        !e.opportunity_id || existingOppIds.has(String(e.opportunity_id))
-    );
+    const events = state.tlAllEvents;
     const now = new Date();
     const curMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
     const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
