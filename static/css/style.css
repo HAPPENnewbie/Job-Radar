@@ -2776,3 +2776,121 @@ select::-ms-expand,
     background:
         linear-gradient(180deg, rgba(239,246,255,.98), rgba(255,255,255,.92)) !important;
 }
+
+/* ============================================================
+   User-defined Category Manager
+   大类 / 二级分类管理：只影响设置文件，不改数据库。
+   ============================================================ */
+.category-settings-section .section-header-row {
+    align-items: flex-start !important;
+    gap: 16px !important;
+}
+.category-manager {
+    display: grid;
+    gap: 14px;
+    margin-top: 16px;
+}
+.category-editor-row {
+    display: grid;
+    grid-template-columns: minmax(180px, 0.75fr) minmax(280px, 1.25fr) auto;
+    align-items: end;
+    gap: 14px;
+    padding: 16px;
+    border-radius: 20px;
+    border: 1px solid rgba(203, 213, 225, .72);
+    background:
+        radial-gradient(circle at 0% 0%, rgba(96, 165, 250, .08), transparent 38%),
+        linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,251,255,.88));
+    box-shadow:
+        0 14px 34px rgba(15, 23, 42, .055),
+        inset 0 1px 0 rgba(255,255,255,.92);
+}
+.category-editor-row .form-group {
+    margin: 0 !important;
+}
+.category-editor-row textarea {
+    min-height: 86px;
+    resize: vertical;
+    line-height: 1.6 !important;
+}
+.category-editor-row .btn-remove-category {
+    align-self: center;
+    white-space: nowrap;
+}
+#opp-category,
+#event-category {
+    font-weight: 680 !important;
+}
+#track-filter.filter-tabs {
+    flex-wrap: wrap;
+}
+#track-filter .filter-tab {
+    min-width: 78px;
+}
+@media (max-width: 860px) {
+    .category-editor-row {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+    .category-editor-row .btn-remove-category {
+        justify-self: flex-start;
+    }
+}
+
+
+/* ============================================================
+   Opportunity Time Display Hotfix 2026-07
+   - 统一机会卡片内时间格式和排版
+   - 避免“2027年1月 至 2027年2月”在窄列中断裂成多行
+   ============================================================ */
+.opp-card .compact-meta > div,
+.compact-opp-card .compact-meta > div,
+.fav-card .compact-meta > div {
+    display: flex !important;
+    align-items: baseline !important;
+    gap: 6px !important;
+    min-width: 0 !important;
+    line-height: 1.55 !important;
+}
+
+.opp-card .compact-meta .meta-key,
+.compact-opp-card .compact-meta .meta-key,
+.fav-card .compact-meta .meta-key {
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+}
+
+.opp-card .compact-meta .meta-time,
+.compact-opp-card .compact-meta .meta-time,
+.fav-card .compact-meta .meta-time {
+    display: inline-flex !important;
+    align-items: center !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    color: #42526a !important;
+    font-weight: 680 !important;
+    letter-spacing: -.01em !important;
+    word-break: keep-all !important;
+    overflow-wrap: normal !important;
+}
+
+@media (min-width: 721px) {
+    .opp-card .compact-meta .meta-time,
+    .compact-opp-card .compact-meta .meta-time,
+    .fav-card .compact-meta .meta-time {
+        white-space: nowrap !important;
+    }
+}
+
+@media (max-width: 720px) {
+    .opp-card .compact-meta > div,
+    .compact-opp-card .compact-meta > div,
+    .fav-card .compact-meta > div {
+        align-items: flex-start !important;
+    }
+    .opp-card .compact-meta .meta-time,
+    .compact-opp-card .compact-meta .meta-time,
+    .fav-card .compact-meta .meta-time {
+        white-space: normal !important;
+    }
+}

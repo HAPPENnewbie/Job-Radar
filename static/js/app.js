@@ -15,6 +15,36 @@ const state = {
 window.state = state;
 
 const JR_SETTINGS = window.JOB_RADAR_SETTINGS || {};
+const DEFAULT_CATEGORY_GROUPS = [
+    { track: '体制/准体制', categories: ['公务员', '事业单位', '烟草', '国企/央企', '银行'] },
+    { track: '互联网/市场化', categories: ['计算机秋招', '互联网大厂', '中小厂', '远程岗位'] },
+];
+
+function normalizeCategoryGroups(raw) {
+    const source = Array.isArray(raw) && raw.length ? raw : DEFAULT_CATEGORY_GROUPS;
+    const seenTracks = new Set();
+    return source.map(group => {
+        const track = String(group && group.track || '').trim();
+        let categories = group && group.categories ? group.categories : [];
+        if (typeof categories === 'string') categories = categories.split(/[，,\n]+/);
+        const seenCats = new Set();
+        categories = (Array.isArray(categories) ? categories : [])
+            .map(v => String(v || '').trim())
+            .filter(v => {
+                if (!v || seenCats.has(v)) return false;
+                seenCats.add(v);
+                return true;
+            });
+        return { track, categories };
+    }).filter(group => {
+        if (!group.track || seenTracks.has(group.track)) return false;
+        seenTracks.add(group.track);
+        return true;
+    });
+}
+
+const JR_CATEGORY_GROUPS = normalizeCategoryGroups(JR_SETTINGS.categories);
+window.JR_CATEGORY_GROUPS = JR_CATEGORY_GROUPS;
 const TL_START = JR_SETTINGS.timeline_start || '2026-07';
 const TL_END = JR_SETTINGS.timeline_end || '2027-12';
 const AXIS_Y = 140;
@@ -92,6 +122,89 @@ function trackTag(t) {
     if (!t) return '';
     const cls = String(t).includes('体制') ? 'tag-track-sys' : 'tag-track-mkt';
     return `<span class="tag ${cls}">${esc(t)}</span>`;
+}
+
+function categoryTracks() {
+    return JR_CATEGORY_GROUPS.map(group => group.track);
+}
+
+function firstTrackValue() {
+    return categoryTracks()[0] || '体制/准体制';
+}
+
+function categoriesForTrack(track) {
+    const group = JR_CATEGORY_GROUPS.find(g => g.track === track);
+    return group ? group.categories : [];
+}
+
+function selectHasValue(select, value) {
+    if (!select || value === undefined || value === null) return false;
+    return Array.from(select.options).some(opt => opt.value === String(value));
+}
+
+function setSelectOptions(select, options, selected, placeholder) {
+    if (!select) return;
+    const current = selected || select.value || '';
+    const opts = [];
+    if (placeholder !== undefined) opts.push({ value: '', label: placeholder });
+    options.forEach(item => {
+        if (typeof item === 'string') opts.push({ value: item, label: item });
+        else opts.push(item);
+    });
+    select.innerHTML = opts.map(opt => `<option value="${esc(opt.value)}">${esc(opt.label || opt.value)}</option>`).join('');
+    if (current && !selectHasValue(select, current)) {
+        const legacy = document.createElement('option');
+        legacy.value = current;
+        legacy.textContent = `${current}（历史值）`;
+        select.appendChild(legacy);
+    }
+    if (current && selectHasValue(select, current)) select.value = current;
+    else if (placeholder !== undefined) select.value = '';
+    else if (select.options.length) select.selectedIndex = 0;
+}
+
+function populateTrackSelect(selectId, selected, includeAll = false) {
+    const select = $(selectId);
+    if (!select) return;
+    const options = categoryTracks().map(track => ({ value: track, label: track }));
+    if (includeAll) options.unshift({ value: 'all', label: '全部' });
+    setSelectOptions(select, options, selected || (includeAll ? 'all' : firstTrackValue()));
+}
+
+function populateCategorySelect(selectId, track, selected, placeholder = '请选择具体类别') {
+    const select = $(selectId);
+    if (!select) return;
+    const categories = categoriesForTrack(track);
+    setSelectOptions(select, categories, selected, categories.length ? placeholder : '当前大类暂无二级分类');
+}
+
+function populateOpportunityCategoryControls(selectedTrack, selectedCategory) {
+    const track = selectedTrack || firstTrackValue();
+    populateTrackSelect('opp-track', track);
+    populateCategorySelect('opp-category', track, selectedCategory, '请选择具体类别');
+}
+
+function populateEventCategoryControls(selectedTrack, selectedCategory) {
+    const track = selectedTrack || firstTrackValue();
+    populateTrackSelect('event-track', track);
+    populateCategorySelect('event-category', track, selectedCategory, '请选择所属类别');
+}
+
+function renderTrackFilterButtons() {
+    const trackFilter = $('track-filter');
+    if (!trackFilter) return;
+    const signature = JSON.stringify(categoryTracks());
+    if (trackFilter.dataset.categorySignature === signature) return;
+    const active = state.track && state.track !== 'all' ? state.track : '';
+    const buttons = [
+        { value: '', label: '全部' },
+        ...categoryTracks().map(track => ({ value: track, label: track })),
+    ];
+    trackFilter.innerHTML = buttons.map(btn => `
+        <button class="filter-tab ${btn.value === active ? 'active' : ''}" data-value="${esc(btn.value)}">${esc(btn.label)}</button>
+    `).join('');
+    trackFilter.dataset.categorySignature = signature;
+    trackFilter.dataset.bound = '0';
 }
 
 function actionTag(a) {
@@ -196,9 +309,86 @@ function trackDotClass(t) {
     return 't-other';
 }
 
-function formatTimeValueSafe(value) {
-    if (typeof window.formatTimeValue === 'function') return window.formatTimeValue(value);
-    return value || '';
+function parseTimePartForDisplay(part) {
+    const raw = String(part || '').trim();
+    const dayMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dayMatch) {
+        return {
+            raw,
+            type: 'day',
+            year: Number(dayMatch[1]),
+            month: Number(dayMatch[2]),
+            day: Number(dayMatch[3]),
+        };
+    }
+    const monthMatch = raw.match(/^(\d{4})-(\d{2})$/);
+    if (monthMatch) {
+        return {
+            raw,
+            type: 'month',
+            year: Number(monthMatch[1]),
+            month: Number(monthMatch[2]),
+            day: null,
+        };
+    }
+    return null;
+}
+
+function formatSingleTimePartForDisplay(part, compact = false) {
+    const parsed = parseTimePartForDisplay(part);
+    if (!parsed) return String(part || '').trim();
+    if (parsed.type === 'day') {
+        return compact
+            ? `${parsed.year}.${String(parsed.month).padStart(2, '0')}.${String(parsed.day).padStart(2, '0')}`
+            : `${parsed.year}年${parsed.month}月${parsed.day}日`;
+    }
+    return compact
+        ? `${parsed.year}.${String(parsed.month).padStart(2, '0')}`
+        : `${parsed.year}年${parsed.month}月`;
+}
+
+function formatTimeRangeForDisplay(start, end, compact = false) {
+    const a = parseTimePartForDisplay(start);
+    const b = parseTimePartForDisplay(end);
+    if (!a || !b) {
+        return `${formatSingleTimePartForDisplay(start, compact)}-${formatSingleTimePartForDisplay(end, compact)}`;
+    }
+
+    if (compact) {
+        if (a.type === 'month' && b.type === 'month' && a.year === b.year) {
+            return `${a.year}.${String(a.month).padStart(2, '0')}-${String(b.month).padStart(2, '0')}`;
+        }
+        if (a.type === 'day' && b.type === 'day' && a.year === b.year && a.month === b.month) {
+            return `${a.year}.${String(a.month).padStart(2, '0')}.${String(a.day).padStart(2, '0')}-${String(b.day).padStart(2, '0')}`;
+        }
+        if (a.type === 'day' && b.type === 'day' && a.year === b.year) {
+            return `${a.year}.${String(a.month).padStart(2, '0')}.${String(a.day).padStart(2, '0')}-${String(b.month).padStart(2, '0')}.${String(b.day).padStart(2, '0')}`;
+        }
+        return `${formatSingleTimePartForDisplay(start, true)}-${formatSingleTimePartForDisplay(end, true)}`;
+    }
+
+    if (a.type === 'month' && b.type === 'month' && a.year === b.year) {
+        return `${a.year}年${a.month}–${b.month}月`;
+    }
+    if (a.type === 'day' && b.type === 'day' && a.year === b.year && a.month === b.month) {
+        return `${a.year}年${a.month}月${a.day}–${b.day}日`;
+    }
+    if (a.type === 'day' && b.type === 'day' && a.year === b.year) {
+        return `${a.year}年${a.month}月${a.day}日–${b.month}月${b.day}日`;
+    }
+    return `${formatSingleTimePartForDisplay(start, false)} 至 ${formatSingleTimePartForDisplay(end, false)}`;
+}
+
+function formatTimeValueSafe(value, options = {}) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const compact = Boolean(options.compact);
+    if (raw.includes('~')) {
+        const [start, end] = raw.split('~').map(s => s.trim());
+        if (!start || !end) return raw;
+        return formatTimeRangeForDisplay(start, end, compact);
+    }
+    return formatSingleTimePartForDisplay(raw, compact);
 }
 
 
@@ -433,11 +623,34 @@ function bindCommonEvents() {
     bindSubmit('form-event', window.saveEv || saveEv);
     bindSubmit('form-fav', window.saveFav || saveFav);
 
+    const oppTrack = $('opp-track');
+    if (oppTrack && oppTrack.dataset.categoryBound !== '1') {
+        oppTrack.dataset.categoryBound = '1';
+        oppTrack.addEventListener('change', () => populateCategorySelect('opp-category', oppTrack.value, '', '请选择具体类别'));
+    }
+    const eventTrack = $('event-track');
+    if (eventTrack && eventTrack.dataset.categoryBound !== '1') {
+        eventTrack.dataset.categoryBound = '1';
+        eventTrack.addEventListener('change', () => populateCategorySelect('event-category', eventTrack.value, '', '请选择所属类别'));
+    }
+    const eventOppSelect = $('event-opportunity-id');
+    if (eventOppSelect && eventOppSelect.dataset.categoryBound !== '1') {
+        eventOppSelect.dataset.categoryBound = '1';
+        eventOppSelect.addEventListener('change', () => {
+            const opp = (state.opps || []).find(o => String(o.id) === String(eventOppSelect.value));
+            if (!opp) return;
+            populateEventCategoryControls(opp.track || firstTrackValue(), opp.category || '');
+            if (!$('event-title')?.value) setValue('event-title', `${opp.name} 时间节点`);
+            if (!$('event-link')?.value) setValue('event-link', opp.announcement_url || opp.official_url || '');
+        });
+    }
+
     bindConfirmButtons();
 }
 
 
 function bindOpportunityFilters() {
+    renderTrackFilterButtons();
     const trackFilter = $('track-filter');
     if (trackFilter && trackFilter.dataset.bound !== '1') {
         trackFilter.dataset.bound = '1';
@@ -468,6 +681,12 @@ function bindOpportunityFilters() {
                 const el = $(id);
                 if (el) el.value = '';
             });
+            state.track = 'all';
+            if (trackFilter) {
+                trackFilter.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+                const allBtn = trackFilter.querySelector('.filter-tab[data-value=""]');
+                if (allBtn) allBtn.classList.add('active');
+            }
             loadOpps();
         });
     }
@@ -807,10 +1026,10 @@ function renderOpps() {
                 <div><span class="meta-key">地域：</span>${esc(o.region)}</div>
                 <div><span class="meta-key">适合计算机硕：</span>${esc(o.fit_computer_master)}</div>
                 <div><span class="meta-key">当前动作：</span>${actionTag(o.current_action)}</div>
-                <div><span class="meta-key">公告/启动：</span>${esc(formatTimeValueSafe(o.expected_announcement_time))}</div>
-                <div><span class="meta-key">报名/投递：</span>${esc(formatTimeValueSafe(o.expected_apply_time))}</div>
-                <div><span class="meta-key">笔试：</span>${esc(formatTimeValueSafe(o.expected_exam_time))}</div>
-                <div><span class="meta-key">面试：</span>${esc(formatTimeValueSafe(o.expected_interview_time))}</div>
+                <div><span class="meta-key">公告/启动：</span><span class="meta-time">${esc(formatTimeValueSafe(o.expected_announcement_time, { compact: false }))}</span></div>
+                <div><span class="meta-key">报名/投递：</span><span class="meta-time">${esc(formatTimeValueSafe(o.expected_apply_time, { compact: false }))}</span></div>
+                <div><span class="meta-key">笔试：</span><span class="meta-time">${esc(formatTimeValueSafe(o.expected_exam_time, { compact: false }))}</span></div>
+                <div><span class="meta-key">面试：</span><span class="meta-time">${esc(formatTimeValueSafe(o.expected_interview_time, { compact: false }))}</span></div>
             </div>
             <div class="opp-card-timeline compact-timeline-box">
                 <div class="timeline-completeness">
@@ -840,8 +1059,7 @@ function openOppModal(opp) {
     setValue('modal-opp-title', opp ? '编辑机会' : '新增机会', 'text');
     setValue('opp-id', opp ? opp.id : '');
     setValue('opp-name', opp ? opp.name : '');
-    setValue('opp-track', opp ? opp.track : '体制/准体制');
-    setValue('opp-category', opp ? opp.category : '');
+    populateOpportunityCategoryControls(opp ? opp.track : firstTrackValue(), opp ? opp.category : '');
     setValue('opp-priority', opp ? opp.priority : '可以关注');
     setValue('opp-region', opp ? opp.region : '全国');
     setValue('opp-fit', opp ? opp.fit_computer_master : '待确认');
@@ -1150,8 +1368,7 @@ function openEvModal(ev) {
     setValue('event-month', ev ? ev.month : '');
     setValue('event-date', ev ? (ev.date || ev.event_date || '') : '');
     setValue('event-title', ev ? ev.title : '');
-    setValue('event-track', ev ? ev.track : '体制/准体制');
-    setValue('event-category', ev ? ev.category : '');
+    populateEventCategoryControls(ev ? ev.track : firstTrackValue(), ev ? ev.category : '');
     setValue('event-status', ev ? ev.status : '待更新');
     setValue('event-link', ev ? ev.link : '');
     setValue('event-note', ev ? ev.note : '');
@@ -1388,9 +1605,9 @@ function renderFavorites() {
                 <div><span class="meta-key">专业要求：</span>${esc(f.major_requirement)}</div>
                 <div><span class="meta-key">学历要求：</span>${esc(f.education_requirement)}</div>
                 <div><span class="meta-key">当前动作：</span>${actionTag(f.current_action)}</div>
-                <div><span class="meta-key">报名时间：</span>${esc(formatTimeValueSafe(f.apply_time))}</div>
-                <div><span class="meta-key">笔试时间：</span>${esc(formatTimeValueSafe(f.exam_time))}</div>
-                <div><span class="meta-key">面试时间：</span>${esc(formatTimeValueSafe(f.interview_time))}</div>
+                <div><span class="meta-key">报名时间：</span><span class="meta-time">${esc(formatTimeValueSafe(f.apply_time, { compact: false }))}</span></div>
+                <div><span class="meta-key">笔试时间：</span><span class="meta-time">${esc(formatTimeValueSafe(f.exam_time, { compact: false }))}</span></div>
+                <div><span class="meta-key">面试时间：</span><span class="meta-time">${esc(formatTimeValueSafe(f.interview_time, { compact: false }))}</span></div>
             </div>
             <div class="fav-card-links">${linkHtml(f.job_url, '岗位链接')}${linkHtml(f.source_url, '公告链接')}</div>
             ${f.note ? `<div class="fav-card-note">${esc(f.note)}</div>` : ''}
