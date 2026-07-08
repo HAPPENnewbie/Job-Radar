@@ -249,12 +249,23 @@
                     <input type="text" id="event-title" required placeholder="如：国考公告预计发布">
                 </div>
                 <div class="form-group">
-                    <label>所属类别</label>
-                    <input type="text" id="event-category" placeholder="如：国考">
+                    <label>节点类型</label>
+                    <select id="event-type">
+                        <option value="其他">其他</option>
+                        <option value="公告">公告</option>
+                        <option value="报名/投递">报名/投递</option>
+                        <option value="笔试/测评">笔试/测评</option>
+                        <option value="面试">面试</option>
+                        <option value="录用/体检">录用/体检</option>
+                    </select>
                 </div>
             </div>
 
             <div class="form-row">
+                <div class="form-group">
+                    <label>所属类别</label>
+                    <input type="text" id="event-category" placeholder="如：国考">
+                </div>
                 <div class="form-group">
                     <label>机会大类</label>
                     <select id="event-track">
@@ -262,6 +273,9 @@
                         <option value="互联网/市场化">互联网 / 市场化</option>
                     </select>
                 </div>
+            </div>
+
+            <div class="form-row">
                 <div class="form-group">
                     <label>状态</label>
                     <select id="event-status">
@@ -270,22 +284,21 @@
                         <option value="待更新">待更新</option>
                     </select>
                 </div>
-            </div>
-
-            <div class="form-group">
-                <label>当前动作</label>
-                <select id="event-current-action">
-                    <option value="">请选择</option>
-                    <option value="等公告">等公告</option>
-                    <option value="等报名">等报名</option>
-                    <option value="待投递">待投递</option>
-                    <option value="已投递">已投递</option>
-                    <option value="待笔试">待笔试</option>
-                    <option value="待面试">待面试</option>
-                    <option value="已结束">已结束</option>
-                    <option value="已放弃">已放弃</option>
-                    <option value="持续关注">持续关注</option>
-                </select>
+                <div class="form-group">
+                    <label>当前动作</label>
+                    <select id="event-current-action">
+                        <option value="">请选择</option>
+                        <option value="等公告">等公告</option>
+                        <option value="等报名">等报名</option>
+                        <option value="待投递">待投递</option>
+                        <option value="已投递">已投递</option>
+                        <option value="待笔试">待笔试</option>
+                        <option value="待面试">待面试</option>
+                        <option value="已结束">已结束</option>
+                        <option value="已放弃">已放弃</option>
+                        <option value="持续关注">持续关注</option>
+                    </select>
+                </div>
             </div>
 
             <div class="form-group">

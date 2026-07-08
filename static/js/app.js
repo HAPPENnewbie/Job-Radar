@@ -509,7 +509,30 @@ function renderOpps() {
         return;
     }
 
-    oppList.innerHTML = state.opps.map(o => `
+    // 统计每条机会的时间线完整度
+    const timelineStats = {};
+    state.opps.forEach(opp => {
+        timelineStats[opp.id] = { types: new Set(), total: 0 };
+    });
+
+    state.tlAllEvents.forEach(ev => {
+        if (ev.opportunity_id && timelineStats[ev.opportunity_id]) {
+            if (ev.event_type) {
+                timelineStats[ev.opportunity_id].types.add(ev.event_type);
+            }
+            timelineStats[ev.opportunity_id].total++;
+        }
+    });
+
+    const coreTypes = ['公告', '报名/投递', '笔试/测评', '面试'];
+
+    oppList.innerHTML = state.opps.map(o => {
+        const stats = timelineStats[o.id] || { types: new Set(), total: 0 };
+        const hasTypes = stats.types;
+        const coreCount = coreTypes.filter(t => hasTypes.has(t)).length;
+        const missingTypes = coreTypes.filter(t => !hasTypes.has(t));
+
+        return `
         <div class="opp-card" data-id="${o.id}">
             <div class="opp-card-header">
                 <h3 class="opp-card-title">${esc(o.name)}</h3>
@@ -531,6 +554,18 @@ function renderOpps() {
                 <div><span class="meta-key">面试：</span>${esc(o.expected_interview_time)}</div>
             </div>
 
+            <div class="opp-card-timeline">
+                <div class="timeline-completeness">
+                    <span class="meta-key">时间线：</span>
+                    <span class="timeline-count">${coreCount}/4</span>
+                    ${missingTypes.length > 0 ? `<span class="timeline-missing">缺少：${esc(missingTypes.join('、'))}</span>` : '<span class="timeline-complete">✓ 完整</span>'}
+                </div>
+                <div class="timeline-actions">
+                    <button class="btn btn-sm btn-primary" onclick="syncTimeline(${o.id})">同步时间线</button>
+                    <a href="/timeline?opportunity_id=${o.id}" class="btn btn-sm btn-secondary">查看日历</a>
+                </div>
+            </div>
+
             <div class="opp-card-links">
                 ${linkHtml(o.official_url, '官网')}
                 ${linkHtml(o.announcement_url, '公告')}
@@ -547,7 +582,7 @@ function renderOpps() {
                 <button class="btn btn-sm btn-danger" onclick="delOpp(${o.id})">删除</button>
             </div>
         </div>
-    `).join('');
+    `}).join('');
 }
 
 /* ============================================================
@@ -975,6 +1010,40 @@ async function setOppStatus(id, status) {
     }
 }
 
+async function syncTimeline(id) {
+    const opp = state.opps.find(o => o.id === id);
+    if (!opp) return;
+
+    try {
+        const resp = await fetch(`/api/opportunities/${id}/sync-timeline`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const result = await resp.json();
+
+        if (!resp.ok || result.ok === false) {
+            alert(result.error || '同步失败');
+            return;
+        }
+
+        let msg = `同步完成：\n`;
+        msg += `创建 ${result.created} 个节点\n`;
+        msg += `更新 ${result.updated} 个节点`;
+        if (result.skipped && result.skipped.length > 0) {
+            msg += `\n\n跳过 ${result.skipped.length} 个字段：`;
+            result.skipped.forEach(s => {
+                msg += `\n- ${s.field}: ${s.reason}`;
+            });
+        }
+        alert(msg);
+
+        await loadData();
+    } catch (err) {
+        console.error(err);
+        alert('同步失败');
+    }
+}
+
 /* ============================================================
    时间线 CRUD
    ============================================================ */
@@ -994,6 +1063,7 @@ function openEvModal(ev) {
     $('event-date-precision').value = ev ? (ev.date_precision || 'month') : 'month';
     $('event-end-date').value = ev ? ev.end_date : '';
     $('event-current-action').value = ev ? ev.current_action : '';
+    $('event-type').value = ev ? (ev.event_type || '其他') : '其他';
 
     // 填充关联机会下拉框（如果模板中存在该字段）
     const eventOppSelect = $('event-opportunity-id');
@@ -1061,6 +1131,7 @@ async function saveEv(e) {
         date_precision: $('event-date-precision').value,
         end_date: $('event-end-date').value,
         current_action: $('event-current-action').value,
+        event_type: $('event-type').value || '其他',
         opportunity_id: $('event-opportunity-id') ? ($('event-opportunity-id').value || null) : null,
     };
     if (!data.month || !data.title) {

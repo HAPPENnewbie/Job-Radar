@@ -19,6 +19,19 @@
     <!-- ========== 筛选工具栏 ========== -->
     <div class="toolbar" style="margin-top: 12px;">
         <div class="toolbar-left">
+            <select id="calendar-filter-opportunity" class="filter-select">
+                <option value="">所有机会</option>
+                <option value="none">未关联机会</option>
+            </select>
+            <select id="calendar-filter-event-type" class="filter-select">
+                <option value="">所有节点类型</option>
+                <option value="公告">公告</option>
+                <option value="报名/投递">报名/投递</option>
+                <option value="笔试/测评">笔试/测评</option>
+                <option value="面试">面试</option>
+                <option value="录用/体检">录用/体检</option>
+                <option value="其他">其他</option>
+            </select>
             <select id="calendar-filter-track" class="filter-select">
                 <option value="">所有类型</option>
                 <option value="体制/准体制">体制/准体制</option>
@@ -70,7 +83,9 @@ const calendarState = {
     events: [],
     currentMonth: null,
     filterTrack: '',
-    filterStatus: ''
+    filterStatus: '',
+    filterOpportunity: '',
+    filterEventType: ''
 };
 
 const escapeHtml = esc;
@@ -110,6 +125,16 @@ function getFilteredCalendarEvents() {
     }
     if (calendarState.filterStatus) {
         events = events.filter(e => e.status === calendarState.filterStatus);
+    }
+    if (calendarState.filterOpportunity) {
+        if (calendarState.filterOpportunity === 'none') {
+            events = events.filter(e => !e.opportunity_id);
+        } else {
+            events = events.filter(e => String(e.opportunity_id) === String(calendarState.filterOpportunity));
+        }
+    }
+    if (calendarState.filterEventType) {
+        events = events.filter(e => e.event_type === calendarState.filterEventType);
     }
     return events;
 }
@@ -289,7 +314,9 @@ function renderEventList() {
             <div class="event-list-content">
                 <div class="event-list-title">${escapeHtml(e.title)}</div>
                 <div class="event-list-meta">
+                    <span class="event-type-badge">${escapeHtml(e.event_type || '其他')}</span>
                     ${escapeHtml(e.category)} | ${escapeHtml(e.track)} | ${escapeHtml(e.status)}
+                    ${e.opportunity_name ? `<span class="event-opp-name">🔗 ${escapeHtml(e.opportunity_name)}</span>` : '<span class="event-opp-none">未关联机会</span>'}
                 </div>
             </div>
             <div class="event-list-actions">
@@ -355,8 +382,10 @@ window.showEventDetail = function(id) {
     body.innerHTML = `
         <div class="detail-field"><div class="detail-label">月份</div><div class="detail-value">${escapeHtml(event.month)}</div></div>
         ${(event.event_date || event.date) ? `<div class="detail-field"><div class="detail-label">具体日期</div><div class="detail-value">${escapeHtml(event.event_date || event.date)}</div></div>` : ''}
+        <div class="detail-field"><div class="detail-label">节点类型</div><div class="detail-value">${escapeHtml(event.event_type || '其他')}</div></div>
         <div class="detail-field"><div class="detail-label">类别</div><div class="detail-value">${escapeHtml(event.category)}</div></div>
-        <div class="detail-field"><div class="detail-label">类型</div><div class="detail-value">${escapeHtml(event.track)}</div></div>
+        <div class="detail-field"><div class="detail-label">大类</div><div class="detail-value">${escapeHtml(event.track)}</div></div>
+        <div class="detail-field"><div class="detail-label">关联机会</div><div class="detail-value">${event.opportunity_name ? escapeHtml(event.opportunity_name) : '<span style="color:var(--c-text-3);">未关联机会</span>'}</div></div>
         <div class="detail-field"><div class="detail-label">状态</div><div class="detail-value">${escapeHtml(event.status)}</div></div>
         ${event.current_action ? `<div class="detail-field"><div class="detail-label">当前动作</div><div class="detail-value">${escapeHtml(event.current_action)}</div></div>` : ''}
         ${event.link ? `<div class="detail-field"><div class="detail-label">链接</div><div class="detail-value"><a href="${escapeHtml(event.link)}" target="_blank">查看</a></div></div>` : ''}
@@ -371,11 +400,13 @@ window.showEventDetail = function(id) {
     modal.style.display = 'flex';
 };
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const closeDetailBtn = document.getElementById('btn-close-detail');
     const detailSearch = document.getElementById('detail-search');
     const filterTrack = document.getElementById('calendar-filter-track');
     const filterStatus = document.getElementById('calendar-filter-status');
+    const filterOpportunity = document.getElementById('calendar-filter-opportunity');
+    const filterEventType = document.getElementById('calendar-filter-event-type');
     const clearFilterBtn = document.getElementById('btn-clear-filter');
 
     if (closeDetailBtn) {
@@ -399,15 +430,57 @@ document.addEventListener('DOMContentLoaded', () => {
         renderEventList();
         if (calendarState.currentMonth) showMonthDetail(calendarState.currentMonth);
     });
-    if (clearFilterBtn) clearFilterBtn.addEventListener('click', () => {
-        calendarState.filterTrack = '';
-        calendarState.filterStatus = '';
-        if (filterTrack) filterTrack.value = '';
-        if (filterStatus) filterStatus.value = '';
+    if (filterOpportunity) filterOpportunity.addEventListener('change', (e) => {
+        calendarState.filterOpportunity = e.target.value;
         renderCalendar();
         renderEventList();
         if (calendarState.currentMonth) showMonthDetail(calendarState.currentMonth);
     });
+    if (filterEventType) filterEventType.addEventListener('change', (e) => {
+        calendarState.filterEventType = e.target.value;
+        renderCalendar();
+        renderEventList();
+        if (calendarState.currentMonth) showMonthDetail(calendarState.currentMonth);
+    });
+    if (clearFilterBtn) clearFilterBtn.addEventListener('click', () => {
+        calendarState.filterTrack = '';
+        calendarState.filterStatus = '';
+        calendarState.filterOpportunity = '';
+        calendarState.filterEventType = '';
+        if (filterTrack) filterTrack.value = '';
+        if (filterStatus) filterStatus.value = '';
+        if (filterOpportunity) filterOpportunity.value = '';
+        if (filterEventType) filterEventType.value = '';
+        renderCalendar();
+        renderEventList();
+        if (calendarState.currentMonth) showMonthDetail(calendarState.currentMonth);
+    });
+
+    // 先加载机会列表以填充机会筛选下拉框
+    try {
+        const resp = await fetch('/api/opportunities');
+        if (resp.ok) {
+            const opps = await resp.json();
+            if (filterOpportunity) {
+                opps.forEach(opp => {
+                    const option = document.createElement('option');
+                    option.value = opp.id;
+                    option.textContent = `${opp.name} (${opp.category})`;
+                    filterOpportunity.appendChild(option);
+                });
+            }
+
+            // 检查 URL 参数 opportunity_id
+            const urlParams = new URLSearchParams(window.location.search);
+            const oppId = urlParams.get('opportunity_id');
+            if (oppId && filterOpportunity) {
+                filterOpportunity.value = oppId;
+                calendarState.filterOpportunity = oppId;
+            }
+        }
+    } catch (e) {
+        console.error('加载机会列表失败', e);
+    }
 
     loadCalendarEvents();
 });

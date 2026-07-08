@@ -72,7 +72,8 @@ def init_db():
             date_precision TEXT DEFAULT 'month',
             end_date TEXT DEFAULT '',
             current_action TEXT DEFAULT '',
-            opportunity_id INTEGER DEFAULT NULL
+            opportunity_id INTEGER DEFAULT NULL,
+            event_type TEXT DEFAULT '其他'
         );
 
         CREATE TABLE IF NOT EXISTS job_favorites (
@@ -120,6 +121,21 @@ def migrate_timeline_fields():
             conn.execute("ALTER TABLE timeline_events ADD COLUMN current_action TEXT DEFAULT ''")
         if 'opportunity_id' not in columns:
             conn.execute("ALTER TABLE timeline_events ADD COLUMN opportunity_id INTEGER DEFAULT NULL")
+        if 'event_type' not in columns:
+            conn.execute("ALTER TABLE timeline_events ADD COLUMN event_type TEXT DEFAULT '其他'")
+
+        # 回填旧数据的 event_type
+        conn.execute("""
+            UPDATE timeline_events
+            SET event_type = CASE
+                WHEN title LIKE '%公告%' OR current_action LIKE '%公告%' THEN '公告'
+                WHEN title LIKE '%报名%' OR title LIKE '%投递%' OR current_action LIKE '%报名%' OR current_action LIKE '%投递%' THEN '报名/投递'
+                WHEN title LIKE '%笔试%' OR title LIKE '%测评%' OR current_action LIKE '%笔试%' OR current_action LIKE '%测评%' THEN '笔试/测评'
+                WHEN title LIKE '%面试%' OR current_action LIKE '%面试%' THEN '面试'
+                ELSE '其他'
+            END
+            WHERE event_type IS NULL OR event_type = '' OR event_type = '其他'
+        """)
 
         # 设置现有记录的 date_precision
         conn.execute("""
@@ -286,15 +302,16 @@ def seed_db():
         conn.execute("""
             INSERT INTO timeline_events
             (month, date, title, track, category, status, link, note, created_at, updated_at,
-             event_date, date_precision, end_date, current_action)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             event_date, date_precision, end_date, current_action, event_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             ev.get('month', ''), ev.get('date', ''),
             ev.get('title', ''), ev.get('track', ''),
             ev.get('category', ''), ev.get('status', '待更新'),
             ev.get('link', ''), ev.get('note', ''), now, now,
             ev.get('event_date', ''), ev.get('date_precision', 'month'),
-            ev.get('end_date', ''), ev.get('current_action', '')
+            ev.get('end_date', ''), ev.get('current_action', ''),
+            ev.get('event_type', '其他')
         ))
 
     for fav in data.get('job_favorites', []):
@@ -368,7 +385,8 @@ def row_to_event(row):
         'date_precision': row['date_precision'],
         'end_date': row['end_date'],
         'current_action': row['current_action'],
-        'opportunity_id': row['opportunity_id']
+        'opportunity_id': row['opportunity_id'],
+        'event_type': row['event_type'] if 'event_type' in row.keys() else '其他'
     }
 
 
@@ -648,6 +666,126 @@ def delete_opportunity(oid):
 
 
 # ============================================================
+# 机会同步时间线 API
+# ============================================================
+
+def parse_month_from_time_text(text):
+    """从时间文本中提取月份，返回 (YYYY-MM, date_str or '') 或 (None, '')"""
+    if not text or not text.strip():
+        return None, ''
+
+    text = text.strip()
+
+    # 匹配 YYYY-MM-DD
+    import re
+    match = re.search(r'(\d{4})-(\d{1,2})-(\d{1,2})', text)
+    if match:
+        y, m, d = match.groups()
+        month = f"{y}-{int(m):02d}"
+        date_str = f"{y}-{int(m):02d}-{int(d):02d}"
+        return month, date_str
+
+    # 匹配 YYYY-MM
+    match = re.search(r'(\d{4})-(\d{1,2})', text)
+    if match:
+        y, m = match.groups()
+        month = f"{y}-{int(m):02d}"
+        return month, ''
+
+    # 无法解析
+    return None, ''
+
+
+@app.route('/api/opportunities/<int:oid>/sync-timeline', methods=['POST'])
+def sync_opportunity_timeline(oid):
+    """根据机会的时间字段自动生成或更新时间线节点"""
+    conn = get_db()
+    try:
+        opp = conn.execute("SELECT * FROM opportunities WHERE id = ?", (oid,)).fetchone()
+        if not opp:
+            return jsonify({'ok': False, 'error': '机会不存在'}), 404
+
+        opp_id = opp['id']
+        opp_name = opp['name']
+        opp_track = opp['track']
+        opp_category = opp['category']
+        opp_status = opp['status']
+        opp_url = opp['official_url'] or opp['announcement_url'] or ''
+
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        # 定义时间字段 -> 事件类型的映射
+        field_mapping = [
+            ('expected_announcement_time', '公告', f'{opp_name} 公告发布'),
+            ('expected_apply_time', '报名/投递', f'{opp_name} 报名/投递'),
+            ('expected_exam_time', '笔试/测评', f'{opp_name} 笔试/测评'),
+            ('expected_interview_time', '面试', f'{opp_name} 面试'),
+        ]
+
+        created = 0
+        updated = 0
+        skipped = []
+
+        for field, event_type, default_title in field_mapping:
+            time_text = opp[field] or ''
+            if not time_text.strip():
+                continue
+
+            month, date_str = parse_month_from_time_text(time_text)
+            if not month:
+                skipped.append({'field': field, 'reason': f'无法解析月份: {time_text}'})
+                continue
+
+            # 查找是否已存在同一机会 + 事件类型的节点
+            existing = conn.execute("""
+                SELECT id FROM timeline_events
+                WHERE opportunity_id = ? AND event_type = ?
+            """, (opp_id, event_type)).fetchone()
+
+            if existing:
+                # 更新现有节点
+                conn.execute("""
+                    UPDATE timeline_events
+                    SET month = ?, date = ?, title = ?, track = ?, category = ?,
+                        status = ?, link = ?, event_date = ?, updated_at = ?
+                    WHERE id = ?
+                """, (
+                    month, date_str, default_title, opp_track, opp_category,
+                    opp_status, opp_url, date_str, now, existing['id']
+                ))
+                updated += 1
+            else:
+                # 创建新节点
+                conn.execute("""
+                    INSERT INTO timeline_events
+                    (month, date, title, track, category, status, link, note,
+                     created_at, updated_at, event_date, date_precision,
+                     current_action, opportunity_id, event_type)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    month, date_str, default_title, opp_track, opp_category,
+                    opp_status, opp_url, '', now, now, date_str,
+                    'day' if date_str else 'month',
+                    '', opp_id, event_type
+                ))
+                created += 1
+
+        conn.commit()
+
+        return jsonify({
+            'ok': True,
+            'created': created,
+            'updated': updated,
+            'skipped': skipped
+        })
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'ok': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+# ============================================================
 # 时间线 API
 # ============================================================
 
@@ -659,40 +797,62 @@ def list_timeline():
 
     track = request.args.get('track', '').strip()
     if track and track != 'all':
-        conditions.append("track = ?")
+        conditions.append("t.track = ?")
         params.append(track)
 
     month_from = request.args.get('month_from', '').strip()
     if month_from:
-        conditions.append("month >= ?")
+        conditions.append("t.month >= ?")
         params.append(month_from)
 
     month_to = request.args.get('month_to', '').strip()
     if month_to:
-        conditions.append("month <= ?")
+        conditions.append("t.month <= ?")
         params.append(month_to)
 
     status = request.args.get('status', '').strip()
     if status:
-        conditions.append("status = ?")
+        conditions.append("t.status = ?")
         params.append(status)
 
     category = request.args.get('category', '').strip()
     if category:
-        conditions.append("category = ?")
+        conditions.append("t.category = ?")
         params.append(category)
+
+    event_type = request.args.get('event_type', '').strip()
+    if event_type and event_type != 'all':
+        conditions.append("t.event_type = ?")
+        params.append(event_type)
+
+    opportunity_id = request.args.get('opportunity_id', '').strip()
+    if opportunity_id and opportunity_id != 'all':
+        if opportunity_id == 'none':
+            conditions.append("t.opportunity_id IS NULL")
+        else:
+            conditions.append("t.opportunity_id = ?")
+            params.append(int(opportunity_id))
 
     q = request.args.get('q', '').strip()
     if q:
-        conditions.append("(title LIKE ? OR note LIKE ?)")
+        conditions.append("(t.title LIKE ? OR t.note LIKE ?)")
         like = f"%{q}%"
         params.extend([like, like])
 
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
-    sql = f"SELECT * FROM timeline_events {where} ORDER BY month ASC, id ASC"
+    sql = f"""SELECT t.*, o.name as opportunity_name
+              FROM timeline_events t
+              LEFT JOIN opportunities o ON t.opportunity_id = o.id
+              {where}
+              ORDER BY t.month ASC, t.id ASC"""
     rows = conn.execute(sql, params).fetchall()
     conn.close()
-    return jsonify([row_to_event(r) for r in rows])
+    result = []
+    for r in rows:
+        ev = row_to_event(r)
+        ev['opportunity_name'] = r['opportunity_name'] if r['opportunity_name'] else ''
+        result.append(ev)
+    return jsonify(result)
 
 
 @app.route('/api/timeline', methods=['POST'])
@@ -704,8 +864,8 @@ def create_event():
     cur = conn.execute("""
         INSERT INTO timeline_events
         (month, date, title, track, category, status, link, note, created_at, updated_at,
-         event_date, date_precision, end_date, current_action, opportunity_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         event_date, date_precision, end_date, current_action, opportunity_id, event_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         data.get('month', ''), data.get('date', ''),
         data.get('title', ''), data.get('track', ''),
@@ -713,7 +873,8 @@ def create_event():
         data.get('link', ''), data.get('note', ''), now, now,
         data.get('event_date', ''), data.get('date_precision', 'month'),
         data.get('end_date', ''), data.get('current_action', ''),
-        data.get('opportunity_id')
+        data.get('opportunity_id'),
+        data.get('event_type', '其他')
     ))
     conn.commit()
     new_id = cur.lastrowid
@@ -728,7 +889,7 @@ def update_event(eid):
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     fields = ['month', 'date', 'title', 'track', 'category', 'status', 'link', 'note',
-              'event_date', 'date_precision', 'end_date', 'current_action', 'opportunity_id']
+              'event_date', 'date_precision', 'end_date', 'current_action', 'opportunity_id', 'event_type']
     sets = []
     params = []
     for f in fields:
@@ -1004,8 +1165,8 @@ def import_data():
             conn.execute("""
                 INSERT INTO timeline_events
                 (month, date, title, track, category, status, link, note, created_at, updated_at,
-                 event_date, date_precision, end_date, current_action, opportunity_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 event_date, date_precision, end_date, current_action, opportunity_id, event_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 ev.get('month', ''), ev.get('date', ''),
                 ev.get('title', ''), ev.get('track', ''),
@@ -1013,7 +1174,8 @@ def import_data():
                 ev.get('link', ''), ev.get('note', ''), now, now,
                 ev.get('event_date', ''), ev.get('date_precision', 'month'),
                 ev.get('end_date', ''), ev.get('current_action', ''),
-                opp_id
+                opp_id,
+                ev.get('event_type', '其他')
             ))
             ev_count += 1
 

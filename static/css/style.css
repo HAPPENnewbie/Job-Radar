@@ -468,6 +468,45 @@ a:hover { text-decoration: underline; }
 }
 .opp-card-links a:hover { background: #dbeafe; }
 
+/* 时间线完整度 */
+.opp-card-timeline {
+    padding: 10px 0;
+    border-top: 1px dashed var(--c-border);
+    border-bottom: 1px dashed var(--c-border);
+    margin: 8px 0;
+}
+.timeline-completeness {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+    margin-bottom: 8px;
+}
+.timeline-count {
+    font-weight: 600;
+    color: var(--c-primary);
+}
+.timeline-missing {
+    font-size: 0.8rem;
+    color: var(--c-warning);
+    background: var(--c-warning-bg);
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+.timeline-complete {
+    font-size: 0.8rem;
+    color: var(--c-success);
+    background: var(--c-success-bg);
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+.timeline-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
 .opp-card-note {
     font-size: 0.82rem;
     color: var(--c-text-2);
@@ -1027,6 +1066,41 @@ a:hover { text-decoration: underline; }
     background: var(--c-info-bg);
     border-radius: var(--radius);
     border-left: 3px solid var(--c-primary);
+}
+
+/* 待办事项筛选工具栏 */
+.todo-filter-toolbar {
+    margin-bottom: 12px;
+}
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 16px;
+}
+.filter-group label {
+    font-size: 0.85rem;
+    color: var(--c-text-2);
+    white-space: nowrap;
+}
+.filter-input {
+    padding: 4px 8px;
+    border: 1px solid var(--c-border);
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+#todo-custom-range {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.todo-range-display {
+    background: var(--c-info-bg);
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: var(--c-text-2);
+    margin-bottom: 16px;
 }
 
 .todo-group-title {
@@ -1827,6 +1901,26 @@ a:hover { text-decoration: underline; }
 .event-list-meta {
     font-size: 0.8rem;
     color: var(--c-text-2);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+.event-type-badge {
+    background: var(--c-primary);
+    color: white;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+.event-opp-name {
+    color: var(--c-success);
+    font-weight: 500;
+}
+.event-opp-none {
+    color: var(--c-text-3);
+    font-style: italic;
 }
 
 .event-list-actions {
