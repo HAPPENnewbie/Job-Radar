@@ -3,15 +3,13 @@
 {% block title %}岗位收藏 - 2027届机会看板{% endblock %}
 
 {% block page_title %}岗位收藏{% endblock %}
-{% block page_desc %}保存具体想报的岗位，不是考试大类{% endblock %}
+{% block page_desc %}展示从机会管理中收藏的机会{% endblock %}
 
 {% block content %}
-    <!-- ========== 说明 ========== -->
     <section class="section info-section">
-        <p class="info-text">💡 这里保存的是具体岗位，例如“衡阳税务某岗位”“湖南烟草衡阳市局某岗位”“某银行科技岗”。</p>
+        <p class="info-text">💡 这里展示从机会管理中收藏的机会。请在“机会管理”页面点击“收藏”按钮添加，不在本页手动新建。</p>
     </section>
 
-    <!-- ========== 工具栏 ========== -->
     <div class="toolbar">
         <div class="toolbar-left">
             <input type="text" id="fav-search" class="search-input" placeholder="搜索岗位名称/单位/专业/备注...">
@@ -37,16 +35,15 @@
             </select>
         </div>
         <div class="toolbar-right">
-            <button id="btn-add-fav" class="btn btn-primary">+ 新增岗位</button>
+            <a href="/opportunities" class="btn btn-secondary">去机会管理收藏</a>
             <button id="btn-export-fav" class="btn btn-secondary">导出 JSON</button>
         </div>
     </div>
 
-    <!-- ========== 岗位列表 ========== -->
     <section class="section">
-        <h2 class="section-title">岗位列表 <span id="fav-count" class="badge">0</span></h2>
+        <h2 class="section-title">收藏列表 <span id="fav-count" class="badge">0</span></h2>
         <div id="fav-list" class="card-grid">
-            <p class="placeholder">加载中...</p>
+            <p class="placeholder">暂无收藏。请前往“机会管理”页面点击“收藏”按钮添加。</p>
         </div>
     </section>
 {% endblock %}

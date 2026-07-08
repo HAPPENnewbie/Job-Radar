@@ -5,12 +5,54 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}2027届机会看板{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .jr-time-picker {
+            border: 1px solid var(--c-border, #e5e7eb);
+            border-radius: 10px;
+            padding: 10px;
+            background: var(--c-bg-soft, #fafafa);
+        }
+        .jr-time-picker-row {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .jr-time-picker-row:last-child { margin-bottom: 0; }
+        .jr-time-picker select,
+        .jr-time-picker input {
+            width: 100%;
+        }
+        .jr-time-picker .jr-end-wrap.is-hidden { display: none; }
+        .jr-time-legacy {
+            margin-top: 6px;
+            font-size: 12px;
+            color: #b45309;
+            display: none;
+        }
+        .jr-time-legacy.show { display: block; }
+        .jr-card-line {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            margin-top: 8px;
+            color: var(--c-text-2, #666);
+            font-size: 0.86rem;
+        }
+        .jr-fav-hint {
+            color: var(--c-text-3, #888);
+            font-size: 0.9rem;
+        }
+        @media (max-width: 720px) {
+            .jr-time-picker-row { grid-template-columns: 1fr; }
+        }
+    </style>
 </head>
 <body>
 
 <div class="app-layout">
 
-    <!-- ========== 侧边栏导航 ========== -->
     <aside class="sidebar">
         <div class="sidebar-header">
             <h2>🧙‍♀️  就业雷达</h2>
@@ -18,32 +60,25 @@
         </div>
         <nav class="sidebar-nav">
             <a href="/" class="nav-item {% if active_page == 'home' %}active{% endif %}">
-                <span class="nav-icon">🏠</span>
-                <span class="nav-text">首页总览</span>
+                <span class="nav-icon">🏠</span><span class="nav-text">首页总览</span>
             </a>
             <a href="/opportunities" class="nav-item {% if active_page == 'opportunities' %}active{% endif %}">
-                <span class="nav-icon">📋</span>
-                <span class="nav-text">机会管理</span>
+                <span class="nav-icon">📋</span><span class="nav-text">机会管理</span>
             </a>
             <a href="/job-favorites" class="nav-item {% if active_page == 'favorites' %}active{% endif %}">
-                <span class="nav-icon">⭐</span>
-                <span class="nav-text">岗位收藏</span>
+                <span class="nav-icon">⭐</span><span class="nav-text">岗位收藏</span>
             </a>
             <a href="/timeline" class="nav-item {% if active_page == 'timeline' %}active{% endif %}">
-                <span class="nav-icon">📅</span>
-                <span class="nav-text">时间日历</span>
+                <span class="nav-icon">📅</span><span class="nav-text">时间日历</span>
             </a>
             <a href="/todos" class="nav-item {% if active_page == 'todos' %}active{% endif %}">
-                <span class="nav-icon">✅</span>
-                <span class="nav-text">待办事项</span>
+                <span class="nav-icon">✅</span><span class="nav-text">待办事项</span>
             </a>
             <a href="/data" class="nav-item {% if active_page == 'data' %}active{% endif %}">
-                <span class="nav-icon">💾</span>
-                <span class="nav-text">数据管理</span>
+                <span class="nav-icon">💾</span><span class="nav-text">数据管理</span>
             </a>
             <a href="/settings" class="nav-item {% if active_page == 'settings' %}active{% endif %}">
-                <span class="nav-icon">⚙️</span>
-                <span class="nav-text">设置</span>
+                <span class="nav-icon">⚙️</span><span class="nav-text">设置</span>
             </a>
         </nav>
         <div class="sidebar-footer">
@@ -52,7 +87,6 @@
         </div>
     </aside>
 
-    <!-- ========== 主内容区 ========== -->
     <main class="main-content">
         <div class="page-header">
             <h1>{% block page_title %}页面标题{% endblock %}</h1>
@@ -65,7 +99,6 @@
 
 </div>
 
-<!-- ========== 公共弹窗容器 ========== -->
 <div id="confirm-dialog" class="modal" style="display:none;">
     <div class="modal-content modal-small">
         <p id="confirm-msg" class="confirm-msg"></p>
@@ -76,7 +109,6 @@
     </div>
 </div>
 
-<!-- ========== 机会表单弹窗 ========== -->
 <div id="modal-opp" class="modal" style="display:none;">
     <div class="modal-content">
         <div class="modal-header">
@@ -132,26 +164,32 @@
                     </select>
                 </div>
             </div>
+
             <div class="form-row">
                 <div class="form-group">
-                    <label>往年公告/启动时间</label>
-                    <input type="text" id="opp-ann-time" placeholder="如：10月">
+                    <label>公告/启动时间</label>
+                    <input type="hidden" id="opp-ann-time">
+                    <div class="jr-time-picker" data-time-picker="opp-ann-time"></div>
                 </div>
                 <div class="form-group">
-                    <label>往年报名/投递时间</label>
-                    <input type="text" id="opp-app-time" placeholder="如：10月">
+                    <label>报名/投递时间</label>
+                    <input type="hidden" id="opp-app-time">
+                    <div class="jr-time-picker" data-time-picker="opp-app-time"></div>
                 </div>
             </div>
             <div class="form-row">
                 <div class="form-group">
                     <label>笔试/测评时间</label>
-                    <input type="text" id="opp-exam-time" placeholder="如：11-12月">
+                    <input type="hidden" id="opp-exam-time">
+                    <div class="jr-time-picker" data-time-picker="opp-exam-time"></div>
                 </div>
                 <div class="form-group">
                     <label>面试/后续时间</label>
-                    <input type="text" id="opp-int-time" placeholder="如：次年2-5月">
+                    <input type="hidden" id="opp-int-time">
+                    <div class="jr-time-picker" data-time-picker="opp-int-time"></div>
                 </div>
             </div>
+
             <div class="form-row">
                 <div class="form-group">
                     <label>官网链接</label>
@@ -208,7 +246,6 @@
     </div>
 </div>
 
-<!-- ========== 时间节点表单弹窗 ========== -->
 <div id="modal-event" class="modal" style="display:none;">
     <div class="modal-content">
         <div class="modal-header">
@@ -217,7 +254,6 @@
         </div>
         <form id="form-event" class="modal-body">
             <input type="hidden" id="event-id">
-
             <div class="form-row">
                 <div class="form-group">
                     <label>月份 <span class="required">*</span></label>
@@ -228,7 +264,6 @@
                     <input type="date" id="event-date">
                 </div>
             </div>
-
             <div class="form-row">
                 <div class="form-group">
                     <label>日期精度</label>
@@ -242,7 +277,6 @@
                     <input type="date" id="event-end-date">
                 </div>
             </div>
-
             <div class="form-row">
                 <div class="form-group">
                     <label>节点标题 <span class="required">*</span></label>
@@ -260,7 +294,6 @@
                     </select>
                 </div>
             </div>
-
             <div class="form-row">
                 <div class="form-group">
                     <label>所属类别</label>
@@ -274,7 +307,6 @@
                     </select>
                 </div>
             </div>
-
             <div class="form-row">
                 <div class="form-group">
                     <label>状态</label>
@@ -300,24 +332,18 @@
                     </select>
                 </div>
             </div>
-
             <div class="form-group">
                 <label>关联机会（可选）</label>
-                <select id="event-opportunity-id">
-                    <option value="">不关联</option>
-                </select>
+                <select id="event-opportunity-id"><option value="">不关联</option></select>
             </div>
-
             <div class="form-group">
                 <label>相关链接</label>
                 <input type="url" id="event-link" placeholder="https://...">
             </div>
-
             <div class="form-group">
                 <label>备注</label>
                 <textarea id="event-note" rows="3"></textarea>
             </div>
-
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">保存</button>
                 <button type="button" class="btn btn-secondary" data-close="modal-event">取消</button>
@@ -326,11 +352,10 @@
     </div>
 </div>
 
-<!-- ========== 岗位收藏表单弹窗 ========== -->
 <div id="modal-fav" class="modal" style="display:none;">
     <div class="modal-content">
         <div class="modal-header">
-            <h3 id="modal-fav-title">新增岗位收藏</h3>
+            <h3 id="modal-fav-title">编辑岗位收藏</h3>
             <button class="modal-close" data-close="modal-fav">&times;</button>
         </div>
         <form id="form-fav" class="modal-body">
@@ -342,7 +367,7 @@
                 </div>
                 <div class="form-group">
                     <label>所属机会</label>
-                    <input type="text" id="fav-opp-name" placeholder="如：国考、互联网大厂秋招">
+                    <input type="text" id="fav-opp-name" readonly>
                 </div>
             </div>
             <div class="form-row">
@@ -381,17 +406,20 @@
                 </div>
                 <div class="form-group">
                     <label>报名/投递时间</label>
-                    <input type="text" id="fav-apply-time" placeholder="如：2026-10">
+                    <input type="hidden" id="fav-apply-time">
+                    <div class="jr-time-picker" data-time-picker="fav-apply-time"></div>
                 </div>
             </div>
             <div class="form-row">
                 <div class="form-group">
                     <label>笔试/测评时间</label>
-                    <input type="text" id="fav-exam-time" placeholder="如：2026-11">
+                    <input type="hidden" id="fav-exam-time">
+                    <div class="jr-time-picker" data-time-picker="fav-exam-time"></div>
                 </div>
                 <div class="form-group">
                     <label>面试时间</label>
-                    <input type="text" id="fav-interview-time" placeholder="如：2027-03">
+                    <input type="hidden" id="fav-interview-time">
+                    <div class="jr-time-picker" data-time-picker="fav-interview-time"></div>
                 </div>
             </div>
             <div class="form-row">
@@ -436,12 +464,9 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>关联机会 ID（可选）</label>
-                <select id="fav-opportunity-id">
-                    <option value="">不关联</option>
-                </select>
+                <label>关联机会</label>
+                <select id="fav-opportunity-id" disabled><option value="">不关联</option></select>
             </div>
-
             <div class="form-group">
                 <label>备注</label>
                 <textarea id="fav-note" rows="3"></textarea>
@@ -454,7 +479,6 @@
     </div>
 </div>
 
-<!-- ========== 时间线节点详情弹窗 ========== -->
 <div id="tl-detail-modal" class="modal" style="display:none;">
     <div class="modal-content modal-small">
         <div class="modal-header">
@@ -465,10 +489,508 @@
     </div>
 </div>
 
-<!-- ========== 时间线悬停提示 ========== -->
 <div id="tl-tooltip" class="tl-tooltip"></div>
 
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script>
+(function () {
+    const TIME_RE_MONTH = /^\d{4}-\d{2}$/;
+    const TIME_RE_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+    function byId(id) { return document.getElementById(id); }
+
+    function isStandardTimeValue(value) {
+        if (!value) return true;
+        const parts = String(value).split('~');
+        if (parts.length > 2) return false;
+        return parts.every(p => TIME_RE_MONTH.test(p) || TIME_RE_DAY.test(p));
+    }
+
+    window.parseTimeValue = function parseTimeValue(value) {
+        value = (value || '').trim();
+        const result = { mode: 'point', precision: 'month', start: '', end: '', legacy: '' };
+        if (!value) return result;
+        if (!isStandardTimeValue(value)) {
+            result.legacy = value;
+            return result;
+        }
+        const parts = value.split('~');
+        result.mode = parts.length === 2 ? 'range' : 'point';
+        result.start = parts[0] || '';
+        result.end = parts[1] || '';
+        result.precision = (result.start.length === 10 || result.end.length === 10) ? 'day' : 'month';
+        return result;
+    };
+
+    window.buildTimeValue = function buildTimeValue(mode, precision, start, end) {
+        start = (start || '').trim();
+        end = (end || '').trim();
+        if (!start) return '';
+        if (mode === 'range') {
+            if (!end) return start;
+            if (end < start) throw new Error('结束时间不能早于开始时间');
+            return `${start}~${end}`;
+        }
+        return start;
+    };
+
+    function renderPickerShell(prefix) {
+        const container = document.querySelector(`[data-time-picker="${prefix}"]`);
+        if (!container || container.dataset.ready === '1') return container;
+        container.dataset.ready = '1';
+        container.innerHTML = `
+            <div class="jr-time-picker-row">
+                <select id="${prefix}-mode" aria-label="时间类型">
+                    <option value="point">时间点</option>
+                    <option value="range">时间段</option>
+                </select>
+                <select id="${prefix}-precision" aria-label="时间精度">
+                    <option value="month">月份</option>
+                    <option value="day">日期</option>
+                </select>
+            </div>
+            <div class="jr-time-picker-row">
+                <input id="${prefix}-start" type="month" aria-label="开始时间">
+                <span id="${prefix}-end-wrap" class="jr-end-wrap is-hidden">
+                    <input id="${prefix}-end" type="month" aria-label="结束时间">
+                </span>
+            </div>
+            <div id="${prefix}-legacy" class="jr-time-legacy"></div>
+        `;
+        const modeEl = byId(`${prefix}-mode`);
+        const precisionEl = byId(`${prefix}-precision`);
+        const syncType = () => {
+            const precision = precisionEl.value;
+            const type = precision === 'day' ? 'date' : 'month';
+            byId(`${prefix}-start`).type = type;
+            byId(`${prefix}-end`).type = type;
+            byId(`${prefix}-end-wrap`).classList.toggle('is-hidden', modeEl.value !== 'range');
+        };
+        modeEl.addEventListener('change', syncType);
+        precisionEl.addEventListener('change', () => {
+            const start = byId(`${prefix}-start`);
+            const end = byId(`${prefix}-end`);
+            start.value = '';
+            end.value = '';
+            syncType();
+        });
+        syncType();
+        return container;
+    }
+
+    window.setupTimePicker = function setupTimePicker(prefix, initialValue) {
+        const container = renderPickerShell(prefix);
+        if (!container) return;
+        const parsed = window.parseTimeValue(initialValue || '');
+        const hidden = byId(prefix);
+        const modeEl = byId(`${prefix}-mode`);
+        const precisionEl = byId(`${prefix}-precision`);
+        const startEl = byId(`${prefix}-start`);
+        const endEl = byId(`${prefix}-end`);
+        const legacyEl = byId(`${prefix}-legacy`);
+        if (hidden) hidden.value = initialValue || '';
+        modeEl.value = parsed.mode;
+        precisionEl.value = parsed.precision;
+        precisionEl.dispatchEvent(new Event('change'));
+        modeEl.value = parsed.mode;
+        modeEl.dispatchEvent(new Event('change'));
+        startEl.value = parsed.legacy ? '' : parsed.start;
+        endEl.value = parsed.legacy ? '' : parsed.end;
+        if (parsed.legacy) {
+            legacyEl.textContent = `旧格式：${parsed.legacy}。保存前请重新选择标准时间。`;
+            legacyEl.classList.add('show');
+        } else {
+            legacyEl.textContent = '';
+            legacyEl.classList.remove('show');
+        }
+    };
+
+    window.readTimePicker = function readTimePicker(prefix) {
+        const container = document.querySelector(`[data-time-picker="${prefix}"]`);
+        const hidden = byId(prefix);
+        if (!container) return hidden ? hidden.value.trim() : '';
+        const value = window.buildTimeValue(
+            byId(`${prefix}-mode`).value,
+            byId(`${prefix}-precision`).value,
+            byId(`${prefix}-start`).value,
+            byId(`${prefix}-end`).value
+        );
+        if (hidden) hidden.value = value;
+        return value;
+    };
+
+    window.formatTimeValue = function formatTimeValue(value) {
+        value = (value || '').trim();
+        if (!value) return '';
+        const fmt = (v) => {
+            if (TIME_RE_DAY.test(v)) {
+                const [y, m, d] = v.split('-');
+                return `${y}年${Number(m)}月${Number(d)}日`;
+            }
+            if (TIME_RE_MONTH.test(v)) {
+                const [y, m] = v.split('-');
+                return `${y}年${Number(m)}月`;
+            }
+            return v;
+        };
+        if (value.includes('~')) {
+            const [a, b] = value.split('~');
+            return `${fmt(a)} 至 ${fmt(b)}`;
+        }
+        return fmt(value);
+    };
+
+    function favoriteForOpp(opp) {
+        if (typeof state === 'undefined' || !Array.isArray(state.favorites)) return null;
+        return state.favorites.find(f =>
+            (f.opportunity_id && String(f.opportunity_id) === String(opp.id)) ||
+            (!f.opportunity_id && f.opportunity_name === opp.name)
+        ) || null;
+    }
+
+    window.favoriteOpp = async function favoriteOpp(id) {
+        const opp = state.opps.find(o => o.id === id);
+        if (!opp) return;
+        if (favoriteForOpp(opp)) {
+            alert('已经收藏过了');
+            return;
+        }
+        const data = {
+            job_name: opp.name,
+            opportunity_name: opp.name,
+            track: opp.track || '',
+            organization: opp.name,
+            region: opp.region || '',
+            major_requirement: '',
+            education_requirement: '',
+            apply_time: opp.expected_apply_time || '',
+            exam_time: opp.expected_exam_time || '',
+            interview_time: opp.expected_interview_time || '',
+            job_url: opp.position_url || opp.apply_url || opp.official_url || '',
+            source_url: opp.announcement_url || opp.official_url || '',
+            match_status: '未判断',
+            priority: opp.priority || '可以关注',
+            current_action: opp.current_action || '待确认',
+            note: opp.note || '',
+            opportunity_id: opp.id
+        };
+        try {
+            const resp = await fetch('/api/job-favorites', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                alert(result.error || '收藏失败');
+                return;
+            }
+            await loadData();
+        } catch (err) {
+            console.error(err);
+            alert('收藏失败');
+        }
+    };
+
+    window.unfavoriteOpp = async function unfavoriteOpp(id) {
+        const opp = state.opps.find(o => o.id === id);
+        if (!opp) return;
+        const fav = favoriteForOpp(opp);
+        if (!fav) return;
+        showConfirm(`确认取消收藏「${opp.name}」？`, async () => {
+            try {
+                const resp = await fetch(`/api/job-favorites/${fav.id}`, { method: 'DELETE' });
+                if (!resp.ok) throw new Error('取消收藏失败');
+                await loadData();
+            } catch (err) {
+                console.error(err);
+                alert('取消收藏失败');
+            }
+        });
+    };
+
+    window.renderOpps = function renderOpps() {
+        if (!oppList || !oppCount) return;
+        oppCount.textContent = state.opps.length;
+        if (state.opps.length === 0) {
+            oppList.innerHTML = '<p class="placeholder">暂无匹配的机会</p>';
+            return;
+        }
+        const timelineStats = {};
+        const events = state.tlAllEvents || [];
+        events.forEach(ev => {
+            if (!ev.opportunity_id) return;
+            if (!timelineStats[ev.opportunity_id]) timelineStats[ev.opportunity_id] = { types: new Set(), total: 0 };
+            if (ev.event_type) timelineStats[ev.opportunity_id].types.add(ev.event_type);
+            timelineStats[ev.opportunity_id].total++;
+        });
+        const coreTypes = ['公告', '报名/投递', '笔试/测评', '面试'];
+        oppList.innerHTML = state.opps.map(o => {
+            const stats = timelineStats[o.id] || { types: new Set(), total: 0 };
+            const coreCount = coreTypes.filter(t => stats.types.has(t)).length;
+            const missingTypes = coreTypes.filter(t => !stats.types.has(t));
+            const fav = favoriteForOpp(o);
+            const favBtn = fav
+                ? `<button class="btn btn-sm btn-warning" onclick="unfavoriteOpp(${o.id})">取消收藏</button>`
+                : `<button class="btn btn-sm btn-primary" onclick="favoriteOpp(${o.id})">收藏</button>`;
+            return `
+                <div class="opp-card" data-id="${o.id}">
+                    <div class="opp-card-header">
+                        <h3 class="opp-card-title">${esc(o.name)}</h3>
+                        <div class="opp-card-badges">${trackTag(o.track)}${statusTag(o.status)}${priorityTag(o.priority)}</div>
+                    </div>
+                    <div class="opp-card-meta">
+                        <div><span class="meta-key">类别：</span>${esc(o.category)}</div>
+                        <div><span class="meta-key">地域：</span>${esc(o.region)}</div>
+                        <div><span class="meta-key">适合计算机硕：</span>${esc(o.fit_computer_master)}</div>
+                        <div><span class="meta-key">当前动作：</span>${actionTag(o.current_action)}</div>
+                        <div><span class="meta-key">公告/启动：</span>${esc(formatTimeValue(o.expected_announcement_time))}</div>
+                        <div><span class="meta-key">报名/投递：</span>${esc(formatTimeValue(o.expected_apply_time))}</div>
+                        <div><span class="meta-key">笔试：</span>${esc(formatTimeValue(o.expected_exam_time))}</div>
+                        <div><span class="meta-key">面试：</span>${esc(formatTimeValue(o.expected_interview_time))}</div>
+                    </div>
+                    <div class="opp-card-timeline">
+                        <div class="timeline-completeness">
+                            <span class="meta-key">时间线：</span><span class="timeline-count">${coreCount}/4</span>
+                            ${missingTypes.length > 0 ? `<span class="timeline-missing">缺少：${esc(missingTypes.join('、'))}</span>` : '<span class="timeline-complete">✓ 完整</span>'}
+                        </div>
+                        <div class="timeline-actions">
+                            <button class="btn btn-sm btn-primary" onclick="syncTimeline(${o.id})">同步时间线</button>
+                            <a href="/timeline?opportunity_id=${o.id}" class="btn btn-sm btn-secondary">查看日历</a>
+                        </div>
+                    </div>
+                    <div class="opp-card-links">
+                        ${linkHtml(o.official_url, '官网')}${linkHtml(o.announcement_url, '公告')}${linkHtml(o.position_url, '岗位表')}${linkHtml(o.apply_url, '报名入口')}
+                    </div>
+                    ${o.note ? `<div class="opp-card-note">${esc(o.note)}</div>` : ''}
+                    <div class="opp-card-actions">
+                        ${favBtn}
+                        <button class="btn btn-sm btn-secondary" onclick="editOpp(${o.id})">编辑</button>
+                        <button class="btn btn-sm btn-success" onclick="setOppStatus(${o.id},'官方已确定')">官方已确定</button>
+                        <button class="btn btn-sm btn-warning" onclick="setOppStatus(${o.id},'待更新')">待更新</button>
+                        <button class="btn btn-sm btn-danger" onclick="delOpp(${o.id})">删除</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    };
+
+    window.openOppModal = function openOppModal(opp) {
+        byId('modal-opp-title').textContent = opp ? '编辑机会' : '新增机会';
+        byId('opp-id').value = opp ? opp.id : '';
+        byId('opp-name').value = opp ? opp.name : '';
+        byId('opp-track').value = opp ? opp.track : '体制/准体制';
+        byId('opp-category').value = opp ? opp.category : '';
+        byId('opp-priority').value = opp ? opp.priority : '可以关注';
+        byId('opp-region').value = opp ? opp.region : '全国';
+        byId('opp-fit').value = opp ? opp.fit_computer_master : '待确认';
+        setupTimePicker('opp-ann-time', opp ? opp.expected_announcement_time : '');
+        setupTimePicker('opp-app-time', opp ? opp.expected_apply_time : '');
+        setupTimePicker('opp-exam-time', opp ? opp.expected_exam_time : '');
+        setupTimePicker('opp-int-time', opp ? opp.expected_interview_time : '');
+        byId('opp-url').value = opp ? opp.official_url : '';
+        byId('opp-ann-url').value = opp ? opp.announcement_url : '';
+        byId('opp-pos-url').value = opp ? opp.position_url : '';
+        byId('opp-apply-url').value = opp ? opp.apply_url : '';
+        byId('opp-status').value = opp ? opp.status : '待更新';
+        byId('opp-action').value = opp ? opp.current_action : '持续关注';
+        byId('opp-note').value = opp ? opp.note : '';
+        modalOpp.style.display = 'flex';
+    };
+
+    window.saveOpp = async function saveOpp(e) {
+        e.preventDefault();
+        let annTime, appTime, examTime, intTime;
+        try {
+            annTime = readTimePicker('opp-ann-time');
+            appTime = readTimePicker('opp-app-time');
+            examTime = readTimePicker('opp-exam-time');
+            intTime = readTimePicker('opp-int-time');
+        } catch (err) {
+            alert(err.message || '时间范围不正确');
+            return;
+        }
+        const id = byId('opp-id').value;
+        const data = {
+            track: byId('opp-track').value,
+            name: byId('opp-name').value.trim(),
+            category: byId('opp-category').value.trim(),
+            priority: byId('opp-priority').value,
+            region: byId('opp-region').value,
+            fit_computer_master: byId('opp-fit').value,
+            expected_announcement_time: annTime,
+            expected_apply_time: appTime,
+            expected_exam_time: examTime,
+            expected_interview_time: intTime,
+            official_url: byId('opp-url').value.trim(),
+            announcement_url: byId('opp-ann-url').value.trim(),
+            position_url: byId('opp-pos-url').value.trim(),
+            apply_url: byId('opp-apply-url').value.trim(),
+            status: byId('opp-status').value,
+            current_action: byId('opp-action').value,
+            note: byId('opp-note').value.trim()
+        };
+        if (!data.name || !data.category) {
+            alert('请填写机会名称和具体类别');
+            return;
+        }
+        try {
+            const resp = await fetch(id ? `/api/opportunities/${id}` : '/api/opportunities', {
+                method: id ? 'PUT' : 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                alert(result.error || '保存失败');
+                return;
+            }
+            modalOpp.style.display = 'none';
+            await loadData();
+        } catch (err) {
+            console.error(err);
+            alert('保存失败');
+        }
+    };
+
+    window.openFavModal = function openFavModal(fav) {
+        if (!fav) {
+            alert('岗位收藏请从“机会管理”页面点击收藏添加。');
+            return;
+        }
+        byId('modal-fav-title').textContent = '编辑岗位收藏';
+        byId('fav-id').value = fav.id || '';
+        byId('fav-job-name').value = fav.job_name || '';
+        byId('fav-opp-name').value = fav.opportunity_name || '';
+        byId('fav-track').value = fav.track || '体制/准体制';
+        byId('fav-organization').value = fav.organization || '';
+        byId('fav-region').value = fav.region || '衡阳';
+        byId('fav-major').value = fav.major_requirement || '';
+        byId('fav-education').value = fav.education_requirement || '';
+        setupTimePicker('fav-apply-time', fav.apply_time || '');
+        setupTimePicker('fav-exam-time', fav.exam_time || '');
+        setupTimePicker('fav-interview-time', fav.interview_time || '');
+        byId('fav-job-url').value = fav.job_url || '';
+        byId('fav-source-url').value = fav.source_url || '';
+        byId('fav-match-status').value = fav.match_status || '未判断';
+        byId('fav-priority').value = fav.priority || '可以关注';
+        byId('fav-action').value = fav.current_action || '待确认';
+        byId('fav-note').value = fav.note || '';
+        populateOpportunitySelect('fav-opportunity-id', fav.opportunity_id || null);
+        byId('fav-opportunity-id').value = fav.opportunity_id || '';
+        byId('modal-fav').style.display = 'flex';
+    };
+
+    window.saveFav = async function saveFav(e) {
+        e.preventDefault();
+        const id = byId('fav-id').value;
+        if (!id) {
+            alert('岗位收藏请从“机会管理”页面点击收藏添加。');
+            return;
+        }
+        let applyTime, examTime, interviewTime;
+        try {
+            applyTime = readTimePicker('fav-apply-time');
+            examTime = readTimePicker('fav-exam-time');
+            interviewTime = readTimePicker('fav-interview-time');
+        } catch (err) {
+            alert(err.message || '时间范围不正确');
+            return;
+        }
+        const data = {
+            job_name: byId('fav-job-name').value.trim(),
+            opportunity_name: byId('fav-opp-name').value.trim(),
+            track: byId('fav-track').value,
+            organization: byId('fav-organization').value.trim(),
+            region: byId('fav-region').value,
+            major_requirement: byId('fav-major').value.trim(),
+            education_requirement: byId('fav-education').value.trim(),
+            apply_time: applyTime,
+            exam_time: examTime,
+            interview_time: interviewTime,
+            job_url: byId('fav-job-url').value.trim(),
+            source_url: byId('fav-source-url').value.trim(),
+            match_status: byId('fav-match-status').value,
+            priority: byId('fav-priority').value,
+            current_action: byId('fav-action').value,
+            note: byId('fav-note').value.trim(),
+            opportunity_id: byId('fav-opportunity-id').value || null
+        };
+        if (!data.job_name) {
+            alert('请填写岗位名称');
+            return;
+        }
+        try {
+            const resp = await fetch(`/api/job-favorites/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                alert(result.error || '保存失败');
+                return;
+            }
+            modalFav.style.display = 'none';
+            await loadData();
+        } catch (err) {
+            console.error(err);
+            alert('保存失败');
+        }
+    };
+
+    window.renderFavorites = function renderFavorites() {
+        if (!favList) return;
+        const q = (favSearch ? favSearch.value : '').trim().toLowerCase();
+        let favs = state.favorites || [];
+        if (q) {
+            favs = favs.filter(f =>
+                (f.job_name || '').toLowerCase().includes(q) ||
+                (f.organization || '').toLowerCase().includes(q) ||
+                (f.major_requirement || '').toLowerCase().includes(q) ||
+                (f.note || '').toLowerCase().includes(q) ||
+                (f.opportunity_name || '').toLowerCase().includes(q)
+            );
+        }
+        const regionFilter = byId('fav-filter-region');
+        const trackFilter = byId('fav-filter-track');
+        const matchFilter = byId('fav-filter-match');
+        if (regionFilter && regionFilter.value) favs = favs.filter(f => f.region === regionFilter.value);
+        if (trackFilter && trackFilter.value) favs = favs.filter(f => f.track === trackFilter.value);
+        if (matchFilter && matchFilter.value) favs = favs.filter(f => f.match_status === matchFilter.value);
+        if (favCount) favCount.textContent = state.favorites.length;
+        if (favs.length === 0) {
+            favList.innerHTML = '<p class="placeholder">暂无收藏。请前往“机会管理”页面点击“收藏”按钮添加。</p>';
+            return;
+        }
+        favList.innerHTML = favs.map(f => `
+            <div class="fav-card">
+                <div class="fav-card-header">
+                    <h3 class="fav-card-title">${esc(f.job_name)}</h3>
+                    <div class="opp-card-badges">${trackTag(f.track)}${matchStatusTag(f.match_status)}${priorityTag(f.priority)}</div>
+                </div>
+                <div class="fav-card-meta">
+                    <div><span class="meta-key">所属机会：</span>${esc(f.opportunity_name)}</div>
+                    <div><span class="meta-key">单位：</span>${esc(f.organization)}</div>
+                    <div><span class="meta-key">地区：</span>${esc(f.region)}</div>
+                    <div><span class="meta-key">专业要求：</span>${esc(f.major_requirement)}</div>
+                    <div><span class="meta-key">学历要求：</span>${esc(f.education_requirement)}</div>
+                    <div><span class="meta-key">当前动作：</span>${actionTag(f.current_action)}</div>
+                    <div><span class="meta-key">报名时间：</span>${esc(formatTimeValue(f.apply_time))}</div>
+                    <div><span class="meta-key">笔试时间：</span>${esc(formatTimeValue(f.exam_time))}</div>
+                    <div><span class="meta-key">面试时间：</span>${esc(formatTimeValue(f.interview_time))}</div>
+                </div>
+                <div class="fav-card-links">${linkHtml(f.job_url, '岗位链接')}${linkHtml(f.source_url, '公告链接')}</div>
+                ${f.note ? `<div class="fav-card-note">${esc(f.note)}</div>` : ''}
+                <div class="fav-card-actions">
+                    <button class="btn btn-sm btn-secondary" onclick="editFav(${f.id})">编辑</button>
+                    <button class="btn btn-sm btn-danger" onclick="delFav(${f.id})">取消收藏</button>
+                </div>
+            </div>
+        `).join('');
+    };
+})();
+</script>
 {% block extra_js %}{% endblock %}
 </body>
 </html>
