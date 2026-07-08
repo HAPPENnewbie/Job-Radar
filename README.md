@@ -1,333 +1,156 @@
-# 2027届计算机硕士毕业去向机会时间线
+# Job-Radar Ubuntu 部署文档
 
-个人求职机会管理看板，用于记录和跟踪 2027 届毕业前后的体制/准体制和互联网/市场化求职机会时间线。
+本文档用于在 Ubuntu 服务器上部署 Job-Radar 项目。项目采用 Flask + SQLite，部署方式为 Gunicorn + systemd。
 
-## 项目简介
-
-这是一个轻量级本地网页工具，帮助我管理：
-
-1. 有哪些可以关注的机会；
-2. 这些机会大概什么时候公告、报名、投递、笔试、面试；
-3. 去哪里查官网或招聘入口；
-4. 当前状态是什么；
-5. 下一步动作是什么；
-6. 后续手动新增、编辑、删除和备份。
-
-**不是**资料百科，**不是**自动爬虫，所有信息最终以官网公告为准。
-
-## 技术栈
-
-- Python + Flask
-- SQLite
-- Jinja2
-- 原生 HTML / CSS / JavaScript
-
-不依赖 Django、Vue、React、Tailwind、复杂构建工具。
-
-## 快速开始
-
-### 1. 克隆项目
+## 1. 创建项目目录
 
 ```bash
-git clone <你的仓库地址>
-cd opportunity-timeline
+mkdir -p /home/ubuntu/python_project
+cd /home/ubuntu/python_project
 ```
 
-### 2. 创建虚拟环境
+## 2. 拉取 Git 项目
 
 ```bash
-python -m venv .venv
+git clone https://github.com/HAPPENnewbie/Job-Radar.git
+cd Job-Radar
 ```
 
-Windows:
+如果项目已经存在，更新代码即可：
+
 ```bash
-.venv\Scripts\activate
+cd /home/ubuntu/python_project/Job-Radar
+git pull
 ```
 
-Linux / macOS:
+## 3. 创建虚拟环境
+
 ```bash
+cd /home/ubuntu/python_project/Job-Radar
+python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-### 3. 安装依赖
+## 4. 安装依赖
+
+确认项目根目录存在 `requirements.txt`：
+
+```txt
+Flask==3.0.3
+gunicorn==22.0.0
+```
+
+安装依赖：
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. 启动项目
+## 5. 测试启动
 
 ```bash
-python app.py
+cd /home/ubuntu/python_project/Job-Radar
+source .venv/bin/activate
+gunicorn -w 2 -b 0.0.0.0:5001 app:app
 ```
 
-### 5. 访问本地网页
+浏览器访问：
 
-浏览器打开: **http://127.0.0.1:5001**
-
-首次启动时，如果数据库不存在，会自动从 `seed/default_data.json` 初始化默认数据。
-
-## 重启应用
-
-当你修改了后端代码（`app.py`）或数据库迁移逻辑后，需要重启应用才能生效。只刷新浏览器不够。
-
-**重启步骤：**
-
-1. **停止当前 Flask 服务**
-   
-   在运行 `python app.py` 的终端里按 `Ctrl + C`
-
-2. **确认文件已更新**
-   
-   确保以下文件已经更新到最新版本：
-   - `app.py` - 后端逻辑
-   - `static/js/app.js` - 前端逻辑
-   - `templates/*.html` - 页面模板
-
-3. **重新启动**
-   
-   ```bash
-   python app.py
-   ```
-
-4. **浏览器强制刷新**
-   
-   按 `Ctrl + F5`（Windows）或 `Cmd + Shift + R`（Mac）强制刷新页面，清除缓存。
-
-**注意**：
-- 如果使用 VS Code 终端，在原来跑项目的终端按 `Ctrl + C`，然后再输入 `python app.py`
-- 启动后观察终端输出，如果有数据库迁移，会显示类似 `[INFO] 数据库迁移：添加 opportunity_id 字段...` 的信息
-- 如果修改了前端文件（`.html`、`.js`、`.css`），也需要重启，因为 Flask 开发服务器会缓存这些文件
-
-## 功能说明
-
-### 新增机会
-
-点击页面顶部「+ 新增机会」按钮，填写表单：
-- 机会名称、大类、类别、优先级、地域
-- 是否适合计算机硕士
-- 往年各阶段时间
-- 官网/公告/岗位表/报名入口链接
-- 当前状态和动作
-- 备注
-
-### 新增时间节点
-
-点击「+ 新增时间节点」按钮，填写月份、标题、类别、状态等。
-
-### 编辑机会/时间节点
-
-点击卡片或节点上的「编辑」按钮，修改信息后保存。
-
-### 删除
-
-点击「删除」按钮，确认后即可删除。
-
-### 搜索
-
-在搜索框输入关键词，可搜索机会名称、类别、地域、备注、链接、当前动作。
-
-### 时间线（横向轴线展示）
-
-时间线区域采用**横向时间轴**展示，从 2026 年 7 月延伸到 2027 年 12 月：
-
-- **始终展示全部节点**：时间线不参与页面上的筛选/搜索，始终显示所有时间节点，方便你直观看到整个毕业前后的机会节奏。
-- **鼠标悬停查看详情**：将鼠标移到节点圆点上，会弹出 tooltip 显示月份、标题、类别、状态、链接、备注。
-- **点击节点编辑**：点击节点打开详情弹窗，可以直接编辑、删除、标记状态。
-- **状态颜色区分**：绿色=官方已确定，橙色=待更新，蓝灰色=参考往年，灰色=已放弃/已结束。
-- **大类形状区分**：实线边框=体制/准体制，虚线边框=互联网/市场化。
-- **当前月份高亮**：当前月份刻度会高亮显示"当前"标签。
-- **节点明细列表**：时间线下方有可搜索的节点明细列表，方便查找和编辑。
-
-**修改时间线范围**：如需修改起止月份，在 `static/js/app.js` 顶部修改：
-```js
-const TL_START = '2026-07';
-const TL_END = '2027-12';
-const TL_TOTAL = 18;  // 总月份数
+```text
+http://服务器IP:5001
 ```
 
-**节点颜色调整**：修改 `static/css/style.css` 中 `.tl-dot.s-confirmed`、`.tl-dot.s-pending`、`.tl-dot.s-reference`、`.tl-dot.s-abandoned` 的背景色。
+测试正常后，在终端按 `Ctrl + C` 停止服务。
 
-**测试 hover 和点击**：启动项目后，鼠标悬停到时间线圆点上查看 tooltip，点击圆点打开详情弹窗。
-
-### 筛选
-
-通过下拉菜单筛选：
-- 只看体制/准体制或互联网/市场化
-- 只看重点关注、衡阳相关、湖南相关、全国机会
-- 只看适合计算机硕士
-- 只看待更新或官方已确定
-- 只看已投递、待笔试、待面试
-
-**注意**：筛选只影响机会列表，不影响时间线。时间线始终展示全部节点。
-
-### 统计卡片
-
-页面顶部显示 6 个统计卡片：
-- **总机会数**：所有机会的总数
-- **重点关注**：标记为重点关注的机会数量
-- **待更新**：状态为"待更新"的机会数量
-- **官方已确定**：状态为"官方已确定"的机会数量
-- **岗位收藏**：收藏的具体岗位数量
-- **近30天节点**：未来30天内的时间线节点数量
-
-### 状态分布条
-
-统计卡片下方有状态分布条，用横向条形图展示各状态的机会占比：
-- 绿色：官方已确定
-- 橙色：待更新
-- 蓝灰色：参考往年
-- 浅灰色：已放弃
-
-### 待办视图
-
-待办视图帮助你快速了解当前需要关注的事项，分为 5 个分组：
-
-1. **本月需关注**：当月的时间线节点 + 需要等公告/等报名的机会
-2. **近30天关注**：未来30天内的时间线节点
-3. **过期待更新**：状态为"参考往年"或"待更新"，且当前动作是等待中的机会
-4. **待确认链接**：缺少官网/公告/岗位表链接的机会
-5. **当前动作待处理**：当前动作是待报名/待投递/待笔试/待面试的机会
-
-每个待办项都提供快捷操作按钮，可以直接编辑或打开相关链接。
-
-### 岗位收藏
-
-岗位收藏用于记录你看到的具体岗位信息，与"机会列表"区分：
-- **机会列表**：记录大类机会（国考、省考、互联网秋招等）
-- **岗位收藏**：记录具体岗位（如"衡阳市税务局信息技术岗"）
-
-**新增岗位收藏**：点击「+ 新增岗位」按钮，填写：
-- 岗位名称、所属机会、单位名称
-- 地区、专业要求、学历要求
-- 报名/笔试/面试时间
-- 岗位链接、公告链接
-- 匹配状态（可能可报/需要确认/明显不符/未判断）
-- 关注优先级、当前动作
-- 备注
-
-**筛选岗位收藏**：使用搜索框和筛选下拉菜单，可按地区、类型、匹配状态筛选。
-
-**导出岗位收藏**：点击「导出岗位 JSON」按钮，单独导出岗位收藏数据。
-
-### 导出 JSON 备份
-
-点击「导出 JSON」按钮，下载当前所有数据到本地 JSON 文件。
-
-### 导入 JSON 恢复
-
-点击「导入 JSON」按钮，选择之前导出的 JSON 文件，覆盖当前数据。
-
-### 重置默认数据
-
-点击「重置默认」按钮，清空当前数据并从 `seed/default_data.json` 重新初始化。
-
-## 修改默认数据
-
-编辑 `seed/default_data.json` 文件：
-- `opportunities` 数组：机会列表
-- `timeline` 数组：时间线节点列表
-
-修改后，需要执行「重置默认数据」操作，或删除 `data/app.db` 后重新启动。
-
-## 上传到 GitHub
+## 6. 创建 systemd 服务
 
 ```bash
-git init
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin <你的仓库地址>
-git push -u origin main
+sudo nano /etc/systemd/system/job-radar.service
 ```
 
-**注意**：`.gitignore` 已配置忽略 `data/app.db` 和 `backups/*.json`，不会上传个人数据。
+写入以下内容：
 
-## 迁移到另一台电脑
+```ini
+[Unit]
+Description=Job Radar Flask App
+After=network.target
 
-1. 在新电脑克隆仓库：
-   ```bash
-   git clone <你的仓库地址>
-   cd opportunity-timeline
-   ```
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/python_project/Job-Radar
+Environment="PATH=/home/ubuntu/python_project/Job-Radar/.venv/bin"
+ExecStart=/home/ubuntu/python_project/Job-Radar/.venv/bin/gunicorn -w 2 -b 0.0.0.0:5001 app:app
+Restart=always
+RestartSec=5
 
-2. 创建虚拟环境并安装依赖：
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # 或 .venv\Scripts\activate (Windows)
-   pip install -r requirements.txt
-   ```
-
-3. 启动项目：
-   ```bash
-   python app.py
-   ```
-
-4. 首次启动会自动从 `seed/default_data.json` 初始化默认数据。
-
-5. 如需恢复之前的数据，导入之前导出的 JSON 备份文件。
-
-## 数据迁移注意事项
-
-本次更新新增了 `job_favorites`（岗位收藏）表。如果你从旧版本升级：
-
-**方案 A：保留旧数据并添加新表**
-1. 备份旧数据库：`cp data/app.db data/app.db.backup`
-2. 启动新版本：`python app.py`
-3. 新版本会自动添加 `job_favorites` 表，旧数据保留
-4. 旧机会和时间线数据不受影响，岗位收藏表初始为空
-
-**方案 B：完全重置**
-1. 删除旧数据库：`rm data/app.db`
-2. 启动新版本：`python app.py`
-3. 会从 `seed/default_data.json` 重新初始化，包含示例岗位收藏
-
-**方案 C：导入旧备份**
-如果你有旧版本的 JSON 备份，可以直接导入。新版本的导入功能会自动处理缺失的 `job_favorites` 字段。
-
-## 为什么 data/app.db 不建议提交到 GitHub
-
-- `data/app.db` 是运行时生成的 SQLite 数据库，包含个人求职数据
-- 不同电脑的数据不同，提交会造成冲突
-- 已通过 `.gitignore` 忽略，不会上传
-- 使用「导出 JSON」功能备份个人数据
-
-## 存储说明
-
-核心数据存储在 SQLite 数据库 `data/app.db`，不使用 localStorage。localStorage 不用于核心存储。
-
-## 重要提醒
-
-所有考试和招聘信息最终以官网公告为准。默认数据和参考往年信息仅为辅助参考，不作为官方依据。
-
-## 项目结构
-
-```
-opportunity-timeline/
-├─ app.py              # Flask 后端
-├─ requirements.txt    # Python 依赖
-├─ README.md           # 本文件
-├─ .gitignore          # Git 忽略配置
-├─ data/               # 数据库目录（运行时生成）
-├─ backups/            # 导出的 JSON 备份
-├─ seed/
-│  └─ default_data.json  # 默认数据模板
-├─ templates/
-│  └─ index.html      # 页面模板
-└─ static/
-   ├─ css/
-   │  └─ style.css    # 样式
-   └─ js/
-      └─ app.js       # 前端逻辑
+[Install]
+WantedBy=multi-user.target
 ```
 
-## 后续扩展
+保存并退出：
 
-如需添加功能，建议：
-- 新增数据字段：修改 `app.py` 中的表结构和 API，修改 `seed/default_data.json`，修改 `templates/index.html` 和 `static/js/app.js`
-- 新增页面功能：在 `static/js/app.js` 中添加逻辑，在 `templates/index.html` 中添加 HTML
-- 新增 API 路由：在 `app.py` 中添加路由
+```text
+Ctrl + O
+Enter
+Ctrl + X
+```
 
-## License
+## 7. 启动服务
 
-MIT
+```bash
+sudo systemctl daemon-reload
+sudo systemctl start job-radar
+sudo systemctl enable job-radar
+```
+
+## 8. 查看服务状态
+
+```bash
+sudo systemctl status job-radar
+```
+
+看到 `active (running)` 表示启动成功。
+
+## 9. 常用命令
+
+重启服务：
+
+```bash
+sudo systemctl restart job-radar
+```
+
+停止服务：
+
+```bash
+sudo systemctl stop job-radar
+```
+
+查看状态：
+
+```bash
+sudo systemctl status job-radar
+```
+
+查看日志：
+
+```bash
+journalctl -u job-radar -f
+```
+
+## 10. 更新项目
+
+```bash
+cd /home/ubuntu/python_project/Job-Radar
+git pull
+source .venv/bin/activate
+pip install -r requirements.txt
+sudo systemctl restart job-radar
+```
+
+## 11. 访问项目
+
+```text
+http://服务器IP:5001
+```
+
+如果云服务器访问不了，需要在服务器安全组中开放 `5001` 端口。
