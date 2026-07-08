@@ -2894,3 +2894,96 @@ select::-ms-expand,
         white-space: normal !important;
     }
 }
+
+/* ============================================================
+   Calendar Opportunity Color System 2026-07
+   同一机会/同一条目在时间日历中使用统一低饱和颜色标识。
+   ============================================================ */
+.calendar-event-colored {
+    --event-accent: #4f7cff;
+    --event-bg: rgba(79, 124, 255, .10);
+    --event-border: rgba(79, 124, 255, .28);
+    position: relative;
+    border-color: var(--event-border) !important;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.86), rgba(248,251,255,.72)),
+        var(--event-bg) !important;
+    box-shadow:
+        0 8px 20px rgba(15, 23, 42, .045),
+        inset 3px 0 0 var(--event-accent),
+        inset 0 1px 0 rgba(255,255,255,.88) !important;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+}
+
+.calendar-event-colored:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--event-accent) 45%, #dbeafe) !important;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,251,255,.86)),
+        var(--event-bg) !important;
+    box-shadow:
+        0 12px 28px rgba(15, 23, 42, .075),
+        inset 4px 0 0 var(--event-accent),
+        inset 0 1px 0 rgba(255,255,255,.92) !important;
+}
+
+.event-item.calendar-event-colored {
+    padding-left: 13px !important;
+    border-radius: 13px !important;
+}
+
+.event-card.calendar-event-colored {
+    border-left: 0 !important;
+    padding-left: 18px !important;
+}
+
+.event-list-item.calendar-event-colored {
+    border-left: 0 !important;
+    padding-left: 16px !important;
+}
+
+.event-color-dot {
+    display: inline-flex;
+    width: 9px;
+    height: 9px;
+    min-width: 9px;
+    margin-right: 7px;
+    border-radius: 999px;
+    vertical-align: 1px;
+    background: var(--event-accent);
+    box-shadow:
+        0 0 0 3px var(--event-bg),
+        0 4px 10px color-mix(in srgb, var(--event-accent) 28%, transparent);
+}
+
+.event-title,
+.event-card-title,
+.event-list-title {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 0;
+}
+
+.event-title .event-color-dot,
+.event-card-title .event-color-dot,
+.event-list-title .event-color-dot {
+    flex: 0 0 auto;
+}
+
+@supports not (color: color-mix(in srgb, #000 50%, #fff)) {
+    .calendar-event-colored:hover {
+        border-color: var(--event-border) !important;
+    }
+    .event-color-dot {
+        box-shadow: 0 0 0 3px var(--event-bg), 0 4px 10px rgba(37, 99, 235, .10);
+    }
+}
+
+@media (max-width: 720px) {
+    .event-item.calendar-event-colored,
+    .event-card.calendar-event-colored,
+    .event-list-item.calendar-event-colored {
+        padding-left: 14px !important;
+    }
+}

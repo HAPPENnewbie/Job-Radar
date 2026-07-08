@@ -1345,7 +1345,7 @@ def import_data():
     if not isinstance(data, dict) or 'opportunities' not in data or 'timeline' not in data:
         return jsonify({'error': 'JSON 结构错误，需包含 opportunities 和 timeline'}), 400
 
-    overwrite = request.form.get('overwrite', 'true').lower() == 'true'
+    overwrite = request.form.get('overwrite', 'false').lower() == 'true'
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     conn = get_db()

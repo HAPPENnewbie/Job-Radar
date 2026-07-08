@@ -1504,13 +1504,13 @@ async function exportData() {
 
 function handleImport() {
     if (!fileInput || !fileInput.files || !fileInput.files[0]) return;
-    showConfirm('导入将覆盖当前所有数据，确认继续？', async () => {
+    showConfirm('导入将以追加方式写入，不会覆盖当前数据。确认继续？', async () => {
         try {
             const form = new FormData();
             form.append('file', fileInput.files[0]);
-            form.append('overwrite', 'true');
+            form.append('overwrite', 'false');
             const result = await fetchJson('/api/import', { method: 'POST', body: form });
-            alert(`导入成功：${result.opp_count || 0} 条机会，${result.event_count || 0} 条时间节点`);
+            alert(`导入成功（${result.mode || '追加'}）：${result.opp_count || 0} 条机会，${result.event_count || 0} 条时间节点`);
             await loadData();
         } catch (err) {
             console.error(err);
