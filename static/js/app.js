@@ -240,6 +240,9 @@ function bindSidebar() {
     const sidebarToggle = $('sidebar-toggle');
     const sidebar = document.querySelector('.sidebar');
     const mainContent = document.querySelector('.main-content');
+    if (sidebarToggle) {
+        sidebarToggle.setAttribute('aria-expanded', document.documentElement.classList.contains('sidebar-collapsed') ? 'false' : 'true');
+    }
     bindSidebarResize(sidebar);
 
     if (sidebarToggle && sidebar && !sidebarToggle.dataset.mobileBound) {
@@ -252,8 +255,10 @@ function bindSidebar() {
             e.preventDefault();
             const root = document.documentElement;
             root.classList.toggle('sidebar-collapsed');
+            const collapsed = root.classList.contains('sidebar-collapsed');
+            sidebarToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
             try {
-                localStorage.setItem('jrSidebarCollapsed', root.classList.contains('sidebar-collapsed') ? '1' : '0');
+                localStorage.setItem('jrSidebarCollapsed', collapsed ? '1' : '0');
             } catch (err) {}
         });
     }
@@ -273,7 +278,7 @@ function bindSidebarResize(sidebar) {
 
     const root = document.documentElement;
     const savedWidth = Number(localStorage.getItem('jrSidebarWidth') || 0);
-    if (savedWidth >= 196 && savedWidth <= 340 && window.innerWidth > 1024) {
+    if (savedWidth >= 220 && savedWidth <= 360 && window.innerWidth > 1024) {
         root.style.setProperty('--sidebar-w', `${savedWidth}px`);
     }
 
@@ -291,7 +296,7 @@ function bindSidebarResize(sidebar) {
     let startWidth = 0;
     let dragging = false;
 
-    const clampWidth = (value) => Math.max(196, Math.min(340, value));
+    const clampWidth = (value) => Math.max(220, Math.min(360, value));
 
     handle.addEventListener('pointerdown', (e) => {
         if (window.innerWidth <= 1024 || root.classList.contains('sidebar-collapsed')) return;
