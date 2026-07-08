@@ -244,8 +244,17 @@ function bindSidebar() {
 
     if (sidebarToggle && sidebar && !sidebarToggle.dataset.mobileBound) {
         sidebarToggle.dataset.mobileBound = '1';
-        sidebarToggle.addEventListener('click', () => {
-            if (window.innerWidth <= 1024) sidebar.classList.toggle('open');
+        sidebarToggle.addEventListener('click', (e) => {
+            if (window.innerWidth <= 1024) {
+                sidebar.classList.toggle('open');
+                return;
+            }
+            e.preventDefault();
+            const root = document.documentElement;
+            root.classList.toggle('sidebar-collapsed');
+            try {
+                localStorage.setItem('jrSidebarCollapsed', root.classList.contains('sidebar-collapsed') ? '1' : '0');
+            } catch (err) {}
         });
     }
 

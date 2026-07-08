@@ -8,7 +8,7 @@
     <style>
         .jr-time-picker {
             border: 1px solid var(--c-border, #e5e7eb);
-            border-radius: 10px;
+            border-radius: 12px;
             padding: 10px;
             background: var(--c-bg-soft, #fafafa);
         }
@@ -20,10 +20,9 @@
         }
         .jr-time-picker-row:last-child { margin-bottom: 0; }
         .jr-time-picker select,
-        .jr-time-picker input {
-            width: 100%;
-        }
-        .jr-time-picker .jr-end-wrap.is-hidden { display: none; }
+        .jr-time-picker input { width: 100%; }
+        .jr-time-picker .jr-end-wrap.is-hidden,
+        .is-hidden { display: none !important; }
         .jr-time-legacy {
             margin-top: 6px;
             font-size: 12px;
@@ -46,125 +45,6 @@
         }
         @media (max-width: 720px) {
             .jr-time-picker-row { grid-template-columns: 1fr; }
-        }
-
-
-        /* ========== 侧边栏收缩 + 分屏适配 ========== */
-        :root {
-            --jr-sidebar-expanded: 240px;
-            --jr-sidebar-collapsed: 72px;
-        }
-        .sidebar,
-        .main-content {
-            transition: width .18s ease, margin-left .18s ease, transform .2s ease;
-        }
-        .sidebar-toggle {
-            display: inline-flex !important;
-            width: 32px;
-            height: 32px;
-            align-items: center;
-            justify-content: center;
-            border-radius: 8px;
-            border: 1px solid var(--c-border, #e5e7eb);
-            background: var(--c-card, #fff);
-        }
-        html.sidebar-collapsed .sidebar {
-            width: var(--jr-sidebar-collapsed);
-        }
-        html.sidebar-collapsed .main-content {
-            margin-left: var(--jr-sidebar-collapsed);
-        }
-        html.sidebar-collapsed .sidebar-header {
-            justify-content: center;
-            padding-left: 10px;
-            padding-right: 10px;
-        }
-        html.sidebar-collapsed .sidebar-header h2,
-        html.sidebar-collapsed .nav-text,
-        html.sidebar-collapsed .sidebar-footer {
-            display: none !important;
-        }
-        html.sidebar-collapsed .sidebar-nav .nav-item {
-            justify-content: center;
-            padding-left: 0;
-            padding-right: 0;
-        }
-        html.sidebar-collapsed .nav-icon {
-            font-size: 1.25rem;
-        }
-        .main-content,
-        .page-content,
-        .section,
-        .toolbar,
-        .toolbar-left,
-        .toolbar-right {
-            min-width: 0;
-        }
-        .main-content {
-            overflow-x: hidden;
-        }
-        .page-content {
-            max-width: 100%;
-        }
-        .toolbar,
-        .toolbar-left,
-        .toolbar-right,
-        .filter-group,
-        .opp-card-actions,
-        .timeline-actions,
-        .fav-card-actions {
-            flex-wrap: wrap;
-        }
-        .card-grid {
-            grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
-        }
-        .calendar-grid {
-            grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
-        }
-        .modal-content {
-            max-width: min(920px, calc(100vw - 24px));
-        }
-        .table-wrap,
-        .event-list,
-        .todo-list {
-            max-width: 100%;
-            overflow-x: auto;
-        }
-        @media (max-width: 1024px) {
-            html.sidebar-collapsed .main-content { margin-left: 0; }
-            html.sidebar-collapsed .sidebar {
-                width: var(--jr-sidebar-expanded);
-                transform: translateX(-100%);
-            }
-            html.sidebar-collapsed .sidebar.open { transform: translateX(0); }
-            html.sidebar-collapsed .sidebar-header h2,
-            html.sidebar-collapsed .nav-text,
-            html.sidebar-collapsed .sidebar-footer {
-                display: block !important;
-            }
-            html.sidebar-collapsed .sidebar-nav .nav-item {
-                justify-content: flex-start;
-                padding-left: 20px;
-                padding-right: 20px;
-            }
-        }
-        @media (max-width: 720px) {
-            .form-row,
-            .fav-card-meta,
-            .opp-card-meta {
-                grid-template-columns: 1fr !important;
-            }
-            .toolbar {
-                align-items: stretch;
-            }
-            .toolbar-left,
-            .toolbar-right {
-                width: 100%;
-            }
-            .todo-item {
-                align-items: flex-start;
-                flex-direction: column;
-            }
         }
     </style>
 
@@ -193,35 +73,55 @@
 
     <aside class="sidebar">
         <div class="sidebar-header">
-            <h2>🧙‍♀️  {{ app_settings.app_name }}</h2>
-            <button class="sidebar-toggle" id="sidebar-toggle">☰</button>
+            <a href="/" class="brand-lockup" aria-label="就业雷达首页">
+                <span class="brand-logo" aria-hidden="true">
+                    <svg viewBox="0 0 32 32" focusable="false">
+                        <defs>
+                            <linearGradient id="jrLogoGradient" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#2563eb"/>
+                                <stop offset="0.55" stop-color="#06b6d4"/>
+                                <stop offset="1" stop-color="#22c55e"/>
+                            </linearGradient>
+                        </defs>
+                        <rect x="3" y="3" width="26" height="26" rx="9" fill="url(#jrLogoGradient)"/>
+                        <path d="M9 18.8 14.1 8.6h3.2L12.2 18.8h5.3l-1.6 4.6" fill="none" stroke="white" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M19.4 9.2h3.1v13.6" fill="none" stroke="white" stroke-width="2.3" stroke-linecap="round"/>
+                    </svg>
+                </span>
+                <span class="brand-wordmark">
+                    <span class="brand-title">就业雷达</span>
+                    <span class="brand-subtitle">Job Radar</span>
+                </span>
+            </a>
+            <button class="sidebar-toggle" id="sidebar-toggle" aria-label="展开或收起侧边栏" title="展开/收起侧边栏">
+                <span></span><span></span><span></span>
+            </button>
         </div>
         <nav class="sidebar-nav">
             <a href="/" class="nav-item {% if active_page == 'home' %}active{% endif %}">
-                <span class="nav-icon">🏠</span><span class="nav-text">首页总览</span>
+                <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 10.8 12 4l8.5 6.8"/><path d="M5.5 9.8V20h13V9.8"/><path d="M9.5 20v-6h5v6"/></svg></span><span class="nav-text">首页总览</span>
             </a>
             <a href="/opportunities" class="nav-item {% if active_page == 'opportunities' %}active{% endif %}">
-                <span class="nav-icon">📋</span><span class="nav-text">机会管理</span>
+                <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 6.5h8"/><path d="M8 11.5h8"/><path d="M8 16.5h5"/><rect x="5" y="3.5" width="14" height="17" rx="3"/></svg></span><span class="nav-text">机会管理</span>
             </a>
             <a href="/job-favorites" class="nav-item {% if active_page == 'favorites' %}active{% endif %}">
-                <span class="nav-icon">⭐</span><span class="nav-text">岗位收藏</span>
+                <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 4.2 2.35 4.76 5.25.76-3.8 3.7.9 5.23L12 16.18 7.3 18.65l.9-5.23-3.8-3.7 5.25-.76L12 4.2Z"/></svg></span><span class="nav-text">岗位收藏</span>
             </a>
             <a href="/timeline" class="nav-item {% if active_page == 'timeline' %}active{% endif %}">
-                <span class="nav-icon">📅</span><span class="nav-text">时间日历</span>
+                <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3.5v3"/><path d="M16 3.5v3"/><path d="M4 9h16"/><path d="M8 13h.01"/><path d="M12 13h.01"/><path d="M16 13h.01"/><path d="M8 17h.01"/><path d="M12 17h.01"/></svg></span><span class="nav-text">时间日历</span>
             </a>
             <a href="/todos" class="nav-item {% if active_page == 'todos' %}active{% endif %}">
-                <span class="nav-icon">✅</span><span class="nav-text">待办事项</span>
+                <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="m8.2 12.2 2.4 2.4 5.2-5.5"/></svg></span><span class="nav-text">待办事项</span>
             </a>
             <a href="/data" class="nav-item {% if active_page == 'data' %}active{% endif %}">
-                <span class="nav-icon">💾</span><span class="nav-text">数据管理</span>
+                <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="6.5" ry="3"/><path d="M5.5 6v6c0 1.66 2.9 3 6.5 3s6.5-1.34 6.5-3V6"/><path d="M5.5 12v6c0 1.66 2.9 3 6.5 3s6.5-1.34 6.5-3v-6"/></svg></span><span class="nav-text">数据管理</span>
             </a>
             <a href="/settings" class="nav-item {% if active_page == 'settings' %}active{% endif %}">
-                <span class="nav-icon">⚙️</span><span class="nav-text">设置</span>
+                <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 8.3a3.7 3.7 0 1 0 0 7.4 3.7 3.7 0 0 0 0-7.4Z"/><path d="M18.6 13.5c.08-.49.08-1.01 0-1.5l2-1.55-2-3.46-2.42.98a7.4 7.4 0 0 0-1.3-.76L14.5 4.6h-4l-.38 2.61c-.46.2-.9.46-1.3.76L6.4 6.99l-2 3.46 2 1.55a7.6 7.6 0 0 0 0 1.5l-2 1.55 2 3.46 2.42-.98c.4.3.84.56 1.3.76l.38 2.61h4l.38-2.61c.46-.2.9-.46 1.3-.76l2.42.98 2-3.46-2-1.55Z"/></svg></span><span class="nav-text">设置</span>
             </a>
         </nav>
         <div class="sidebar-footer">
-            <div class="footer-text">{{ app_settings.grad_year }}</div>
-            <div class="footer-text">{{ app_settings.major }}</div>
+            <div class="footer-powered">powered by hayden</div>
         </div>
     </aside>
 
@@ -633,26 +533,6 @@
 
 <script>
 (function () {
-    document.addEventListener('DOMContentLoaded', function () {
-        const btn = document.getElementById('sidebar-toggle');
-        if (!btn || btn.dataset.collapseBound === '1') return;
-        btn.dataset.collapseBound = '1';
-        btn.setAttribute('title', '展开/收起侧边栏');
-        btn.addEventListener('click', function (e) {
-            if (window.innerWidth <= 1024) return;
-            e.preventDefault();
-            e.stopPropagation();
-            const root = document.documentElement;
-            root.classList.toggle('sidebar-collapsed');
-            try {
-                localStorage.setItem('jrSidebarCollapsed', root.classList.contains('sidebar-collapsed') ? '1' : '0');
-            } catch (err) {}
-        }, true);
-    });
-})();
-</script>
-<script>
-(function () {
     const TIME_RE_MONTH = /^\d{4}-\d{2}$/;
     const TIME_RE_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -719,8 +599,7 @@
         const modeEl = byId(`${prefix}-mode`);
         const precisionEl = byId(`${prefix}-precision`);
         const syncType = () => {
-            const precision = precisionEl.value;
-            const type = precision === 'day' ? 'date' : 'month';
+            const type = precisionEl.value === 'day' ? 'date' : 'month';
             byId(`${prefix}-start`).type = type;
             byId(`${prefix}-end`).type = type;
             byId(`${prefix}-end-wrap`).classList.toggle('is-hidden', modeEl.value !== 'range');
@@ -797,356 +676,6 @@
             return `${fmt(a)} 至 ${fmt(b)}`;
         }
         return fmt(value);
-    };
-
-    function favoriteForOpp(opp) {
-        if (typeof state === 'undefined' || !Array.isArray(state.favorites)) return null;
-        return state.favorites.find(f =>
-            (f.opportunity_id && String(f.opportunity_id) === String(opp.id)) ||
-            (!f.opportunity_id && f.opportunity_name === opp.name)
-        ) || null;
-    }
-
-    window.favoriteOpp = async function favoriteOpp(id) {
-        const opp = state.opps.find(o => o.id === id);
-        if (!opp) return;
-        if (favoriteForOpp(opp)) {
-            alert('已经收藏过了');
-            return;
-        }
-        const data = {
-            job_name: opp.name,
-            opportunity_name: opp.name,
-            track: opp.track || '',
-            organization: opp.name,
-            region: opp.region || '',
-            major_requirement: '',
-            education_requirement: '',
-            apply_time: opp.expected_apply_time || '',
-            exam_time: opp.expected_exam_time || '',
-            interview_time: opp.expected_interview_time || '',
-            job_url: opp.position_url || opp.apply_url || opp.official_url || '',
-            source_url: opp.announcement_url || opp.official_url || '',
-            match_status: '未判断',
-            priority: opp.priority || '可以关注',
-            current_action: opp.current_action || '待确认',
-            note: opp.note || '',
-            opportunity_id: opp.id
-        };
-        try {
-            const resp = await fetch(`/api/opportunities/${id}/favorite`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-            const result = await resp.json().catch(() => ({}));
-            if (!resp.ok) {
-                alert(result.error || '收藏失败');
-                return;
-            }
-            await loadData();
-        } catch (err) {
-            console.error(err);
-            alert('收藏失败');
-        }
-    };
-
-    window.unfavoriteOpp = async function unfavoriteOpp(id) {
-        const opp = state.opps.find(o => o.id === id);
-        if (!opp) return;
-        const fav = favoriteForOpp(opp);
-        if (!fav) return;
-        showConfirm(`确认取消收藏「${opp.name}」？`, async () => {
-            try {
-                const resp = await fetch(`/api/opportunities/${id}/favorite`, { method: 'DELETE' });
-                if (!resp.ok) throw new Error('取消收藏失败');
-                await loadData();
-            } catch (err) {
-                console.error(err);
-                alert('取消收藏失败');
-            }
-        });
-    };
-
-    window.renderOpps = function renderOpps() {
-        if (!oppList || !oppCount) return;
-        oppCount.textContent = state.opps.length;
-        if (state.opps.length === 0) {
-            oppList.innerHTML = '<p class="placeholder">暂无匹配的机会</p>';
-            return;
-        }
-        const timelineStats = {};
-        const events = state.tlAllEvents || [];
-        events.forEach(ev => {
-            if (!ev.opportunity_id) return;
-            if (!timelineStats[ev.opportunity_id]) timelineStats[ev.opportunity_id] = { types: new Set(), total: 0 };
-            if (ev.event_type) timelineStats[ev.opportunity_id].types.add(ev.event_type);
-            timelineStats[ev.opportunity_id].total++;
-        });
-        const coreTypes = ['公告', '报名/投递', '笔试/测评', '面试'];
-        oppList.innerHTML = state.opps.map(o => {
-            const stats = timelineStats[o.id] || { types: new Set(), total: 0 };
-            const coreCount = coreTypes.filter(t => stats.types.has(t)).length;
-            const missingTypes = coreTypes.filter(t => !stats.types.has(t));
-            const fav = favoriteForOpp(o);
-            const favBtn = fav
-                ? `<button class="btn btn-sm btn-warning" onclick="unfavoriteOpp(${o.id})">取消收藏</button>`
-                : `<button class="btn btn-sm btn-primary" onclick="favoriteOpp(${o.id})">收藏</button>`;
-            return `
-                <div class="opp-card" data-id="${o.id}">
-                    <div class="opp-card-header">
-                        <h3 class="opp-card-title">${esc(o.name)}</h3>
-                        <div class="opp-card-badges">${trackTag(o.track)}${statusTag(o.status)}${priorityTag(o.priority)}</div>
-                    </div>
-                    <div class="opp-card-meta">
-                        <div><span class="meta-key">类别：</span>${esc(o.category)}</div>
-                        <div><span class="meta-key">地域：</span>${esc(o.region)}</div>
-                        <div><span class="meta-key">适合计算机硕：</span>${esc(o.fit_computer_master)}</div>
-                        <div><span class="meta-key">当前动作：</span>${actionTag(o.current_action)}</div>
-                        <div><span class="meta-key">公告/启动：</span>${esc(formatTimeValue(o.expected_announcement_time))}</div>
-                        <div><span class="meta-key">报名/投递：</span>${esc(formatTimeValue(o.expected_apply_time))}</div>
-                        <div><span class="meta-key">笔试：</span>${esc(formatTimeValue(o.expected_exam_time))}</div>
-                        <div><span class="meta-key">面试：</span>${esc(formatTimeValue(o.expected_interview_time))}</div>
-                    </div>
-                    <div class="opp-card-timeline">
-                        <div class="timeline-completeness">
-                            <span class="meta-key">时间线：</span><span class="timeline-count">${coreCount}/4</span>
-                            ${missingTypes.length > 0 ? `<span class="timeline-missing">缺少：${esc(missingTypes.join('、'))}</span>` : '<span class="timeline-complete">✓ 完整</span>'}
-                        </div>
-                        <div class="timeline-actions">
-                            <button class="btn btn-sm btn-primary" onclick="syncTimeline(${o.id})">同步时间线</button>
-                            <a href="/timeline?opportunity_id=${o.id}" class="btn btn-sm btn-secondary">查看日历</a>
-                        </div>
-                    </div>
-                    <div class="opp-card-links">
-                        ${linkHtml(o.official_url, '官网')}${linkHtml(o.announcement_url, '公告')}${linkHtml(o.position_url, '岗位表')}${linkHtml(o.apply_url, '报名入口')}
-                    </div>
-                    ${o.note ? `<div class="opp-card-note">${esc(o.note)}</div>` : ''}
-                    <div class="opp-card-actions">
-                        ${favBtn}
-                        <button class="btn btn-sm btn-secondary" onclick="editOpp(${o.id})">编辑</button>
-                        <button class="btn btn-sm btn-success" onclick="setOppStatus(${o.id},'官方已确定')">官方已确定</button>
-                        <button class="btn btn-sm btn-warning" onclick="setOppStatus(${o.id},'待更新')">待更新</button>
-                        <button class="btn btn-sm btn-danger" onclick="delOpp(${o.id})">删除</button>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    };
-
-    window.openOppModal = function openOppModal(opp) {
-        byId('modal-opp-title').textContent = opp ? '编辑机会' : '新增机会';
-        byId('opp-id').value = opp ? opp.id : '';
-        byId('opp-name').value = opp ? opp.name : '';
-        byId('opp-track').value = opp ? opp.track : '体制/准体制';
-        byId('opp-category').value = opp ? opp.category : '';
-        byId('opp-priority').value = opp ? opp.priority : '可以关注';
-        byId('opp-region').value = opp ? opp.region : '全国';
-        byId('opp-fit').value = opp ? opp.fit_computer_master : '待确认';
-        setupTimePicker('opp-ann-time', opp ? opp.expected_announcement_time : '');
-        setupTimePicker('opp-app-time', opp ? opp.expected_apply_time : '');
-        setupTimePicker('opp-exam-time', opp ? opp.expected_exam_time : '');
-        setupTimePicker('opp-int-time', opp ? opp.expected_interview_time : '');
-        byId('opp-url').value = opp ? opp.official_url : '';
-        byId('opp-ann-url').value = opp ? opp.announcement_url : '';
-        byId('opp-pos-url').value = opp ? opp.position_url : '';
-        byId('opp-apply-url').value = opp ? opp.apply_url : '';
-        byId('opp-status').value = opp ? opp.status : '待更新';
-        byId('opp-action').value = opp ? opp.current_action : '持续关注';
-        byId('opp-note').value = opp ? opp.note : '';
-        modalOpp.style.display = 'flex';
-    };
-
-    window.saveOpp = async function saveOpp(e) {
-        e.preventDefault();
-        let annTime, appTime, examTime, intTime;
-        try {
-            annTime = readTimePicker('opp-ann-time');
-            appTime = readTimePicker('opp-app-time');
-            examTime = readTimePicker('opp-exam-time');
-            intTime = readTimePicker('opp-int-time');
-        } catch (err) {
-            alert(err.message || '时间范围不正确');
-            return;
-        }
-        const id = byId('opp-id').value;
-        const data = {
-            track: byId('opp-track').value,
-            name: byId('opp-name').value.trim(),
-            category: byId('opp-category').value.trim(),
-            priority: byId('opp-priority').value,
-            region: byId('opp-region').value,
-            fit_computer_master: byId('opp-fit').value,
-            expected_announcement_time: annTime,
-            expected_apply_time: appTime,
-            expected_exam_time: examTime,
-            expected_interview_time: intTime,
-            official_url: byId('opp-url').value.trim(),
-            announcement_url: byId('opp-ann-url').value.trim(),
-            position_url: byId('opp-pos-url').value.trim(),
-            apply_url: byId('opp-apply-url').value.trim(),
-            status: byId('opp-status').value,
-            current_action: byId('opp-action').value,
-            note: byId('opp-note').value.trim()
-        };
-        if (!data.name || !data.category) {
-            alert('请填写机会名称和具体类别');
-            return;
-        }
-        try {
-            const resp = await fetch(id ? `/api/opportunities/${id}` : '/api/opportunities', {
-                method: id ? 'PUT' : 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-            const result = await resp.json().catch(() => ({}));
-            if (!resp.ok) {
-                alert(result.error || '保存失败');
-                return;
-            }
-            modalOpp.style.display = 'none';
-            await loadData();
-        } catch (err) {
-            console.error(err);
-            alert('保存失败');
-        }
-    };
-
-    window.openFavModal = function openFavModal(fav) {
-        if (!fav) {
-            alert('岗位收藏请从“机会管理”页面点击收藏添加。');
-            return;
-        }
-        byId('modal-fav-title').textContent = '编辑岗位收藏';
-        byId('fav-id').value = fav.id || '';
-        byId('fav-job-name').value = fav.job_name || '';
-        byId('fav-opp-name').value = fav.opportunity_name || '';
-        byId('fav-track').value = fav.track || '体制/准体制';
-        byId('fav-organization').value = fav.organization || '';
-        byId('fav-region').value = fav.region || '衡阳';
-        byId('fav-major').value = fav.major_requirement || '';
-        byId('fav-education').value = fav.education_requirement || '';
-        setupTimePicker('fav-apply-time', fav.apply_time || '');
-        setupTimePicker('fav-exam-time', fav.exam_time || '');
-        setupTimePicker('fav-interview-time', fav.interview_time || '');
-        byId('fav-job-url').value = fav.job_url || '';
-        byId('fav-source-url').value = fav.source_url || '';
-        byId('fav-match-status').value = fav.match_status || '未判断';
-        byId('fav-priority').value = fav.priority || '可以关注';
-        byId('fav-action').value = fav.current_action || '待确认';
-        byId('fav-note').value = fav.note || '';
-        populateOpportunitySelect('fav-opportunity-id', fav.opportunity_id || null);
-        byId('fav-opportunity-id').value = fav.opportunity_id || '';
-        byId('modal-fav').style.display = 'flex';
-    };
-
-    window.saveFav = async function saveFav(e) {
-        e.preventDefault();
-        const id = byId('fav-id').value;
-        if (!id) {
-            alert('岗位收藏请从“机会管理”页面点击收藏添加。');
-            return;
-        }
-        let applyTime, examTime, interviewTime;
-        try {
-            applyTime = readTimePicker('fav-apply-time');
-            examTime = readTimePicker('fav-exam-time');
-            interviewTime = readTimePicker('fav-interview-time');
-        } catch (err) {
-            alert(err.message || '时间范围不正确');
-            return;
-        }
-        const data = {
-            job_name: byId('fav-job-name').value.trim(),
-            opportunity_name: byId('fav-opp-name').value.trim(),
-            track: byId('fav-track').value,
-            organization: byId('fav-organization').value.trim(),
-            region: byId('fav-region').value,
-            major_requirement: byId('fav-major').value.trim(),
-            education_requirement: byId('fav-education').value.trim(),
-            apply_time: applyTime,
-            exam_time: examTime,
-            interview_time: interviewTime,
-            job_url: byId('fav-job-url').value.trim(),
-            source_url: byId('fav-source-url').value.trim(),
-            match_status: byId('fav-match-status').value,
-            priority: byId('fav-priority').value,
-            current_action: byId('fav-action').value,
-            note: byId('fav-note').value.trim(),
-            opportunity_id: byId('fav-opportunity-id').value || null
-        };
-        if (!data.job_name) {
-            alert('请填写岗位名称');
-            return;
-        }
-        try {
-            const resp = await fetch(`/api/job-favorites/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-            const result = await resp.json().catch(() => ({}));
-            if (!resp.ok) {
-                alert(result.error || '保存失败');
-                return;
-            }
-            modalFav.style.display = 'none';
-            await loadData();
-        } catch (err) {
-            console.error(err);
-            alert('保存失败');
-        }
-    };
-
-    window.renderFavorites = function renderFavorites() {
-        if (!favList) return;
-        const q = (favSearch ? favSearch.value : '').trim().toLowerCase();
-        let favs = state.favorites || [];
-        if (q) {
-            favs = favs.filter(f =>
-                (f.job_name || '').toLowerCase().includes(q) ||
-                (f.organization || '').toLowerCase().includes(q) ||
-                (f.major_requirement || '').toLowerCase().includes(q) ||
-                (f.note || '').toLowerCase().includes(q) ||
-                (f.opportunity_name || '').toLowerCase().includes(q)
-            );
-        }
-        const regionFilter = byId('fav-filter-region');
-        const trackFilter = byId('fav-filter-track');
-        const matchFilter = byId('fav-filter-match');
-        if (regionFilter && regionFilter.value) favs = favs.filter(f => f.region === regionFilter.value);
-        if (trackFilter && trackFilter.value) favs = favs.filter(f => f.track === trackFilter.value);
-        if (matchFilter && matchFilter.value) favs = favs.filter(f => f.match_status === matchFilter.value);
-        if (favCount) favCount.textContent = state.favorites.length;
-        if (favs.length === 0) {
-            favList.innerHTML = '<p class="placeholder">暂无收藏。请前往“机会管理”页面点击“收藏”按钮添加。</p>';
-            return;
-        }
-        favList.innerHTML = favs.map(f => `
-            <div class="fav-card">
-                <div class="fav-card-header">
-                    <h3 class="fav-card-title">${esc(f.job_name)}</h3>
-                    <div class="opp-card-badges">${trackTag(f.track)}${matchStatusTag(f.match_status)}${priorityTag(f.priority)}</div>
-                </div>
-                <div class="fav-card-meta">
-                    <div><span class="meta-key">所属机会：</span>${esc(f.opportunity_name)}</div>
-                    <div><span class="meta-key">单位：</span>${esc(f.organization)}</div>
-                    <div><span class="meta-key">地区：</span>${esc(f.region)}</div>
-                    <div><span class="meta-key">专业要求：</span>${esc(f.major_requirement)}</div>
-                    <div><span class="meta-key">学历要求：</span>${esc(f.education_requirement)}</div>
-                    <div><span class="meta-key">当前动作：</span>${actionTag(f.current_action)}</div>
-                    <div><span class="meta-key">报名时间：</span>${esc(formatTimeValue(f.apply_time))}</div>
-                    <div><span class="meta-key">笔试时间：</span>${esc(formatTimeValue(f.exam_time))}</div>
-                    <div><span class="meta-key">面试时间：</span>${esc(formatTimeValue(f.interview_time))}</div>
-                </div>
-                <div class="fav-card-links">${linkHtml(f.job_url, '岗位链接')}${linkHtml(f.source_url, '公告链接')}</div>
-                ${f.note ? `<div class="fav-card-note">${esc(f.note)}</div>` : ''}
-                <div class="fav-card-actions">
-                    <button class="btn btn-sm btn-secondary" onclick="editFav(${f.id})">编辑</button>
-                    <button class="btn btn-sm btn-danger" onclick="delFav(${f.id})">取消收藏</button>
-                </div>
-            </div>
-        `).join('');
     };
 })();
 </script>

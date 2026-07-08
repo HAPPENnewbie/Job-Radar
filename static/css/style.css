@@ -752,3 +752,308 @@ a.btn,
     .main-content,
     html.sidebar-collapsed .main-content { width: 100% !important; margin-left: 0 !important; }
 }
+
+
+/* ============================================================
+   2026-07 Sidebar Refinement
+   - 浅色但与内容区有区分度的侧边栏
+   - 内联 SVG 图标 / 艺术字 logo / 底部 powered by hayden
+   - 导航项在拖拽宽度后保持整体居中
+   ============================================================ */
+:root {
+    --sidebar-w: 236px;
+    --sidebar-collapsed-w: 74px;
+    --sidebar-min-w: 196px;
+    --sidebar-max-w: 340px;
+    --sidebar-surface-1: #eef5ff;
+    --sidebar-surface-2: #e8f0ff;
+    --sidebar-surface-3: #f6fbff;
+    --sidebar-line: rgba(125, 151, 188, .34);
+    --sidebar-text: #334155;
+    --sidebar-muted: #718096;
+    --sidebar-active-text: #1e40af;
+}
+
+.sidebar {
+    background:
+        radial-gradient(circle at 10% 0%, rgba(147, 197, 253, .42), transparent 34%),
+        linear-gradient(180deg, var(--sidebar-surface-3) 0%, var(--sidebar-surface-1) 40%, var(--sidebar-surface-2) 100%) !important;
+    border-right: 1px solid var(--sidebar-line) !important;
+    box-shadow: 16px 0 38px rgba(44, 82, 130, .10), inset -1px 0 0 rgba(255,255,255,.72) !important;
+}
+.sidebar::before {
+    background:
+        linear-gradient(145deg, rgba(255,255,255,.62), transparent 42%),
+        radial-gradient(circle at 95% 24%, rgba(59, 130, 246, .10), transparent 32%) !important;
+}
+.sidebar-header {
+    min-height: 76px !important;
+    padding: 16px 16px 14px !important;
+    border-bottom: 1px solid rgba(148, 163, 184, .24) !important;
+}
+.brand-lockup {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    color: inherit;
+    text-decoration: none;
+}
+.brand-logo {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 13px;
+    background: linear-gradient(135deg, #dbeafe, #e0f2fe);
+    box-shadow: 0 10px 24px rgba(37,99,235,.16), inset 0 1px 0 rgba(255,255,255,.85);
+}
+.brand-logo svg { width: 28px; height: 28px; }
+.brand-wordmark {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    line-height: 1.05;
+}
+.brand-title {
+    font-size: 1.18rem;
+    font-weight: 920;
+    letter-spacing: -.055em;
+    background: linear-gradient(105deg, #1e3a8a 0%, #2563eb 45%, #0891b2 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 12px 24px rgba(37, 99, 235, .14);
+}
+.brand-subtitle {
+    margin-top: 4px;
+    color: #7c8aa3;
+    font-size: .62rem;
+    font-weight: 760;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+}
+.sidebar-toggle {
+    position: relative;
+    z-index: 2;
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 14px !important;
+    color: #475569 !important;
+    background: linear-gradient(180deg, rgba(255,255,255,.76), rgba(226,232,240,.76)) !important;
+    border: 1px solid rgba(148, 163, 184, .42) !important;
+    box-shadow: 0 10px 22px rgba(30, 64, 175, .10), inset 0 1px 0 rgba(255,255,255,.82) !important;
+}
+.sidebar-toggle span {
+    display: block;
+    width: 14px;
+    height: 2px;
+    border-radius: 999px;
+    background: currentColor;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    transition: transform var(--dur) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+}
+.sidebar-toggle span:nth-child(1) { top: 11px; }
+.sidebar-toggle span:nth-child(2) { top: 17px; }
+.sidebar-toggle span:nth-child(3) { top: 23px; }
+.sidebar-toggle:hover {
+    color: #1d4ed8 !important;
+    background: #ffffff !important;
+    border-color: rgba(96, 165, 250, .56) !important;
+}
+
+.sidebar-nav {
+    position: relative;
+    z-index: 1;
+    flex: 0 0 auto !important;
+    padding: 14px 10px 10px !important;
+}
+.nav-item {
+    justify-content: center !important;
+    min-height: 48px !important;
+    padding: 10px 12px !important;
+    gap: 12px !important;
+    color: var(--sidebar-text) !important;
+    border-radius: 17px !important;
+    font-size: 1rem !important;
+    letter-spacing: -.01em !important;
+}
+.nav-item:hover {
+    color: #1d4ed8 !important;
+    background: rgba(255, 255, 255, .70) !important;
+    border-color: rgba(147, 197, 253, .56) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 12px 26px rgba(59, 130, 246, .10) !important;
+}
+.nav-item.active {
+    color: var(--sidebar-active-text) !important;
+    background: linear-gradient(135deg, rgba(219,234,254,.98), rgba(224,242,254,.92)) !important;
+    border-color: rgba(96, 165, 250, .55) !important;
+    box-shadow: 0 14px 30px rgba(37, 99, 235, .13), inset 0 1px 0 rgba(255,255,255,.86) !important;
+}
+.nav-icon {
+    width: 24px !important;
+    flex: 0 0 24px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: currentColor !important;
+}
+.nav-icon svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: .92;
+}
+.nav-text {
+    flex: 0 1 auto !important;
+    min-width: 0;
+    text-align: center !important;
+    font-size: 1.01rem !important;
+    font-weight: 760 !important;
+    letter-spacing: -.015em !important;
+    color: inherit !important;
+}
+.sidebar-footer {
+    position: relative;
+    z-index: 1;
+    margin-top: auto !important;
+    padding: 18px 16px 20px !important;
+    border-top: 1px solid rgba(148, 163, 184, .26) !important;
+    background: linear-gradient(180deg, transparent, rgba(255,255,255,.28)) !important;
+}
+.footer-powered {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 34px;
+    border-radius: 14px;
+    color: #64748b;
+    font-size: .78rem;
+    font-weight: 780;
+    letter-spacing: .08em;
+    text-transform: lowercase;
+    background: rgba(255,255,255,.54);
+    border: 1px solid rgba(203, 213, 225, .62);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.75);
+}
+.footer-text { display: none !important; }
+.sidebar-resizer {
+    right: -1px;
+    width: 10px;
+}
+.sidebar:hover .sidebar-resizer,
+.sidebar-resizer:hover,
+html.sidebar-resizing .sidebar-resizer {
+    background: linear-gradient(180deg, transparent, rgba(37,99,235,.20), transparent) !important;
+}
+html.sidebar-collapsed .brand-wordmark,
+html.sidebar-collapsed .nav-text,
+html.sidebar-collapsed .sidebar-footer {
+    opacity: 0 !important;
+    width: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+}
+html.sidebar-collapsed .sidebar-header {
+    justify-content: center !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+}
+html.sidebar-collapsed .brand-lockup { gap: 0; }
+html.sidebar-collapsed .sidebar-toggle { display: none !important; }
+html.sidebar-collapsed .nav-item {
+    justify-content: center !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+/* 更克制的浅色按钮体系 */
+.btn-primary {
+    color: #1e40af !important;
+    background: linear-gradient(180deg, #eff6ff, #dbeafe) !important;
+    border-color: #bfdbfe !important;
+    box-shadow: 0 8px 18px rgba(37,99,235,.09) !important;
+}
+.btn-primary:hover { background: #dbeafe !important; }
+.btn-success {
+    color: #166534 !important;
+    background: linear-gradient(180deg, #f0fdf4, #dcfce7) !important;
+    border-color: #bbf7d0 !important;
+}
+.btn-warning {
+    color: #92400e !important;
+    background: linear-gradient(180deg, #fffbeb, #fef3c7) !important;
+    border-color: #fde68a !important;
+}
+.btn-danger {
+    color: #991b1b !important;
+    background: linear-gradient(180deg, #fef2f2, #fee2e2) !important;
+    border-color: #fecaca !important;
+}
+.btn-secondary {
+    color: #475569 !important;
+    background: linear-gradient(180deg, #ffffff, #f8fafc) !important;
+    border-color: #dbe3ee !important;
+}
+.btn-favorited {
+    color: #6d28d9 !important;
+    background: linear-gradient(180deg, #faf5ff, #f3e8ff) !important;
+    border-color: #e9d5ff !important;
+}
+
+/* 机会卡片重新定宽：单个机会不铺满整行，文字不再显小 */
+#opp-list.card-grid,
+#opp-list {
+    grid-template-columns: repeat(auto-fill, minmax(360px, 460px)) !important;
+    justify-content: start !important;
+    gap: 14px !important;
+}
+#opp-list .opp-card {
+    max-width: 460px !important;
+    min-height: 0 !important;
+    padding: 14px 15px !important;
+    gap: 9px !important;
+}
+#opp-list .opp-card-title {
+    font-size: 1.08rem !important;
+    letter-spacing: -.02em !important;
+}
+#opp-list .opp-card-meta {
+    font-size: .9rem !important;
+    line-height: 1.55 !important;
+    gap: 5px 12px !important;
+}
+#opp-list .opp-card-timeline,
+#opp-list .compact-timeline-box {
+    padding: 9px 10px !important;
+}
+#opp-list .opp-card-actions .btn,
+#opp-list .timeline-actions .btn {
+    min-height: 31px !important;
+    padding: 6px 10px !important;
+}
+@media (max-width: 900px) {
+    #opp-list.card-grid,
+    #opp-list { grid-template-columns: 1fr !important; }
+    #opp-list .opp-card { max-width: none !important; }
+}
+
+@media (max-width: 1024px) {
+    .sidebar { background: linear-gradient(180deg, #f6fbff, #eaf3ff) !important; }
+    .nav-item { justify-content: flex-start !important; }
+    .sidebar-footer { display: block !important; }
+    html.sidebar-collapsed .sidebar-toggle { display: inline-flex !important; }
+}
