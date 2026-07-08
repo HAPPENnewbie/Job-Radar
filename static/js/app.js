@@ -1063,23 +1063,26 @@ function showTlDetail(id) {
     $('tl-detail-title').textContent = ev.title || '节点详情';
 
     const rows = [
-        [dateLabel, mainDate],
-        ev.end_date ? ['结束', ev.end_date] : null,
-        ['节点类型', ev.event_type || '其他'],
-        ev.opportunity_name ? ['关联机会', ev.opportunity_name] : null,
-        ['类别', ev.category || '-'],
-        ['大类', trackTag(ev.track) || '-'],
-        ['状态', statusTag(ev.status) || '-'],
-        ev.current_action ? ['当前动作', actionTag(ev.current_action)] : null,
-        ev.link ? ['链接', linkHtml(ev.link, '打开链接')] : null,
+        { label: dateLabel, value: mainDate || '-', tone: 'primary' },
+        ev.end_date ? { label: '结束时间', value: ev.end_date, tone: 'primary' } : null,
+        { label: '节点类型', value: ev.event_type || '其他' },
+        ev.opportunity_name ? { label: '关联机会', value: ev.opportunity_name } : null,
+        { label: '具体类别', value: ev.category || '-' },
+        { label: '机会大类', value: trackTag(ev.track) || '-' },
+        { label: '当前状态', value: statusTag(ev.status) || '-' },
+        ev.current_action ? { label: '当前动作', value: actionTag(ev.current_action) } : null,
+        ev.link ? { label: '官网链接', value: linkHtml(ev.link, '打开链接'), wide: true } : null,
     ].filter(Boolean);
 
-    const gridHtml = rows.map(([label, value]) => `
-        <div class="detail-row">
-            <div class="detail-label">${esc(label)}</div>
-            <div class="detail-value">${typeof value === 'string' && value.includes('<') ? value : esc(value)}</div>
-        </div>
-    `).join('');
+    const gridHtml = rows.map((row) => {
+        const safeValue = typeof row.value === 'string' && row.value.includes('<') ? row.value : esc(row.value);
+        return `
+            <div class="detail-row ${row.wide ? 'detail-row-wide' : ''} ${row.tone ? `detail-row-${row.tone}` : ''}">
+                <div class="detail-label">${esc(row.label)}</div>
+                <div class="detail-value">${safeValue}</div>
+            </div>
+        `;
+    }).join('');
 
     tlDetailBody.innerHTML = `
         <div class="detail-hero">

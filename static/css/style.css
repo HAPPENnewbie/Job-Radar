@@ -2502,3 +2502,277 @@ select::-ms-expand,
 .filter-select::-ms-expand {
     display: none !important;
 }
+
+/* ============================================================
+   Detail Modal Density & Two-column Refinement 2026-07
+   目标：详情弹窗字体更清晰、信息更充实、字段左右分布，不再全部挤在左侧。
+   ============================================================ */
+#tl-detail-modal.modal {
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+#tl-detail-modal .modal-content {
+    width: min(720px, calc(100vw - 40px)) !important;
+    max-height: calc(100vh - 48px) !important;
+    border-radius: 26px !important;
+    overflow: hidden !important;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,251,255,.94)) !important;
+    border: 1px solid rgba(203, 213, 225, .72) !important;
+    box-shadow:
+        0 34px 88px rgba(15, 23, 42, .24),
+        0 10px 28px rgba(15, 23, 42, .10),
+        inset 0 1px 0 rgba(255,255,255,.92) !important;
+}
+
+#tl-detail-modal .modal-header {
+    min-height: 72px !important;
+    padding: 20px 24px !important;
+    background:
+        radial-gradient(circle at 0% 0%, rgba(96, 165, 250, .10), transparent 36%),
+        linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,251,255,.90)) !important;
+    border-bottom: 1px solid rgba(203, 213, 225, .72) !important;
+}
+
+#tl-detail-modal .modal-header h3,
+#tl-detail-title {
+    max-width: calc(100% - 54px) !important;
+    color: #0f172a !important;
+    font-size: 1.22rem !important;
+    line-height: 1.35 !important;
+    font-weight: 860 !important;
+    letter-spacing: -.025em !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+#tl-detail-modal .modal-close {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    border-radius: 14px !important;
+    color: #64748b !important;
+    background: linear-gradient(180deg, #f8fafc, #eef4fb) !important;
+    border: 1px solid rgba(203, 213, 225, .88) !important;
+    box-shadow: 0 8px 18px rgba(15,23,42,.06), inset 0 1px 0 rgba(255,255,255,.9) !important;
+}
+
+#tl-detail-modal .modal-close:hover {
+    color: #1e40af !important;
+    background: #ffffff !important;
+    border-color: rgba(147, 197, 253, .72) !important;
+    transform: translateY(-1px) !important;
+}
+
+#tl-detail-modal .detail-modal-body,
+#tl-detail-body {
+    padding: 22px 24px 0 !important;
+    overflow-y: auto !important;
+    max-height: calc(100vh - 140px) !important;
+}
+
+#tl-detail-modal .detail-hero {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: start !important;
+    gap: 18px !important;
+    padding: 18px 20px !important;
+    border-radius: 22px !important;
+    border: 1px solid rgba(191, 219, 254, .72) !important;
+    background:
+        radial-gradient(circle at 100% 0%, rgba(99, 102, 241, .10), transparent 38%),
+        linear-gradient(135deg, rgba(239,246,255,.92), rgba(255,255,255,.96) 54%, rgba(240,249,255,.82)) !important;
+    box-shadow:
+        0 14px 34px rgba(37, 99, 235, .08),
+        inset 0 1px 0 rgba(255,255,255,.92) !important;
+}
+
+#tl-detail-modal .detail-eyebrow {
+    color: #3b6aa5 !important;
+    font-size: .82rem !important;
+    line-height: 1.2 !important;
+    font-weight: 820 !important;
+    letter-spacing: .08em !important;
+}
+
+#tl-detail-modal .detail-title {
+    margin-top: 6px !important;
+    color: #0f172a !important;
+    font-size: 1.18rem !important;
+    line-height: 1.38 !important;
+    font-weight: 860 !important;
+    letter-spacing: -.025em !important;
+}
+
+#tl-detail-modal .detail-subtitle {
+    margin-top: 8px !important;
+    color: #52647c !important;
+    font-size: .96rem !important;
+    line-height: 1.5 !important;
+    font-weight: 620 !important;
+}
+
+#tl-detail-modal .detail-hero-tags {
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+    flex-wrap: wrap !important;
+    min-width: 150px !important;
+}
+
+#tl-detail-modal .detail-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(240px, 1fr)) !important;
+    gap: 12px !important;
+    margin-top: 16px !important;
+}
+
+#tl-detail-modal .detail-row,
+#tl-detail-modal .detail-modal-field {
+    display: grid !important;
+    grid-template-columns: 92px minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: 12px !important;
+    min-height: 58px !important;
+    margin: 0 !important;
+    padding: 13px 15px !important;
+    border-radius: 18px !important;
+    border: 1px solid rgba(219, 229, 242, .95) !important;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.94), rgba(248,251,255,.82)) !important;
+    box-shadow:
+        0 8px 20px rgba(15, 23, 42, .045),
+        inset 0 1px 0 rgba(255,255,255,.94) !important;
+}
+
+#tl-detail-modal .detail-row:hover,
+#tl-detail-modal .detail-modal-field:hover {
+    border-color: rgba(147, 197, 253, .75) !important;
+    background:
+        linear-gradient(180deg, #ffffff, #f7fbff) !important;
+    box-shadow:
+        0 12px 26px rgba(37, 99, 235, .07),
+        inset 0 1px 0 rgba(255,255,255,.96) !important;
+}
+
+#tl-detail-modal .detail-label,
+#tl-detail-modal .detail-modal-key {
+    color: #5b6e86 !important;
+    font-size: .94rem !important;
+    line-height: 1.35 !important;
+    font-weight: 760 !important;
+    white-space: nowrap !important;
+}
+
+#tl-detail-modal .detail-value,
+#tl-detail-modal .detail-modal-val {
+    min-width: 0 !important;
+    color: #0f172a !important;
+    font-size: 1.02rem !important;
+    line-height: 1.42 !important;
+    font-weight: 760 !important;
+    overflow-wrap: anywhere !important;
+}
+
+#tl-detail-modal .detail-value .tag,
+#tl-detail-modal .detail-modal-val .tag {
+    margin: 2px 4px 2px 0 !important;
+    font-size: .86rem !important;
+    padding: 4px 9px !important;
+    border-radius: 999px !important;
+}
+
+#tl-detail-modal .detail-note,
+#tl-detail-modal .detail-modal-note {
+    margin-top: 16px !important;
+    padding: 16px 18px !important;
+    border-radius: 20px !important;
+    border: 1px solid rgba(219, 229, 242, .96) !important;
+    color: #243142 !important;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,251,255,.86)) !important;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, .045), inset 0 1px 0 rgba(255,255,255,.92) !important;
+    font-size: .98rem !important;
+    line-height: 1.75 !important;
+}
+
+#tl-detail-modal .detail-actions,
+#tl-detail-modal .detail-modal-actions {
+    position: sticky !important;
+    bottom: 0 !important;
+    z-index: 2 !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+    margin: 18px -24px 0 !important;
+    padding: 16px 24px !important;
+    border-top: 1px solid rgba(203, 213, 225, .78) !important;
+    background: rgba(248, 251, 255, .94) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+}
+
+#tl-detail-modal .detail-actions .btn,
+#tl-detail-modal .detail-modal-actions .btn {
+    min-height: 38px !important;
+    padding: 8px 15px !important;
+    border-radius: 15px !important;
+    font-size: .94rem !important;
+    font-weight: 780 !important;
+}
+
+@media (max-width: 720px) {
+    #tl-detail-modal .modal-content {
+        width: min(100vw - 24px, 640px) !important;
+        border-radius: 22px !important;
+    }
+    #tl-detail-modal .modal-header {
+        padding: 18px 18px !important;
+    }
+    #tl-detail-modal .detail-modal-body,
+    #tl-detail-body {
+        padding: 18px 18px 0 !important;
+    }
+    #tl-detail-modal .detail-hero {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+        padding: 16px !important;
+    }
+    #tl-detail-modal .detail-hero-tags {
+        justify-content: flex-start !important;
+        min-width: 0 !important;
+    }
+    #tl-detail-modal .detail-grid {
+        grid-template-columns: 1fr !important;
+    }
+    #tl-detail-modal .detail-row,
+    #tl-detail-modal .detail-modal-field {
+        grid-template-columns: 86px minmax(0, 1fr) !important;
+        min-height: 54px !important;
+    }
+    #tl-detail-modal .detail-actions,
+    #tl-detail-modal .detail-modal-actions {
+        margin-left: -18px !important;
+        margin-right: -18px !important;
+        padding: 14px 18px !important;
+        justify-content: stretch !important;
+    }
+    #tl-detail-modal .detail-actions .btn,
+    #tl-detail-modal .detail-modal-actions .btn {
+        flex: 1 1 120px !important;
+    }
+}
+
+#tl-detail-modal .detail-row-wide {
+    grid-column: 1 / -1 !important;
+}
+#tl-detail-modal .detail-row-primary {
+    border-color: rgba(147, 197, 253, .86) !important;
+    background:
+        linear-gradient(180deg, rgba(239,246,255,.98), rgba(255,255,255,.92)) !important;
+}
