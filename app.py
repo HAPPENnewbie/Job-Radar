@@ -920,6 +920,7 @@ def export_data():
 def import_data():
     if 'file' not in request.files:
         return jsonify({'error': '未上传文件'}), 400
+
     f = request.files['file']
     if not f.filename.endswith('.json'):
         return jsonify({'error': '文件必须是 JSON 格式'}), 400
@@ -936,80 +937,126 @@ def import_data():
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     conn = get_db()
-    if overwrite:
-        conn.execute("DELETE FROM opportunities")
-        conn.execute("DELETE FROM timeline_events")
-        conn.execute("DELETE FROM job_favorites")
+    old_opp_id_to_new_id = {}
+    opp_name_to_new_id = {}
 
-    opp_count = 0
-    for opp in data['opportunities']:
-        if not opp.get('name'):
-            continue
-        conn.execute("""
-            INSERT INTO opportunities
-            (track, name, category, priority, region, fit_computer_master,
-             expected_announcement_time, expected_apply_time,
-             expected_exam_time, expected_interview_time,
-             official_url, announcement_url, position_url, apply_url,
-             status, current_action, note, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            opp.get('track', ''), opp.get('name', ''),
-            opp.get('category', ''), opp.get('priority', '可以关注'),
-            opp.get('region', '全国'), opp.get('fit_computer_master', '待确认'),
-            opp.get('expected_announcement_time', ''),
-            opp.get('expected_apply_time', ''),
-            opp.get('expected_exam_time', ''),
-            opp.get('expected_interview_time', ''),
-            opp.get('official_url', ''), opp.get('announcement_url', ''),
-            opp.get('position_url', ''), opp.get('apply_url', ''),
-            opp.get('status', '待更新'), opp.get('current_action', '持续关注'),
-            opp.get('note', ''), now, now
-        ))
-        opp_count += 1
+    try:
+        if overwrite:
+            conn.execute("DELETE FROM opportunities")
+            conn.execute("DELETE FROM timeline_events")
+            conn.execute("DELETE FROM job_favorites")
 
-    ev_count = 0
-    for ev in data['timeline']:
-        if not ev.get('title') or not ev.get('month'):
-            continue
-        conn.execute("""
-            INSERT INTO timeline_events
-            (month, title, track, category, status, link, note, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            ev.get('month', ''), ev.get('title', ''),
-            ev.get('track', ''), ev.get('category', ''),
-            ev.get('status', '待更新'), ev.get('link', ''),
-            ev.get('note', ''), now, now
-        ))
-        ev_count += 1
+        opp_count = 0
+        for opp in data.get('opportunities', []):
+            if not opp.get('name'):
+                continue
 
-    fav_count = 0
-    for fav in data.get('job_favorites', []):
-        if not fav.get('job_name'):
-            continue
-        conn.execute("""
-            INSERT INTO job_favorites
-            (job_name, opportunity_name, track, organization, region,
-             major_requirement, education_requirement, apply_time, exam_time, interview_time,
-             job_url, source_url, match_status, priority, current_action, note,
-             created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            fav.get('job_name', ''), fav.get('opportunity_name', ''),
-            fav.get('track', ''), fav.get('organization', ''),
-            fav.get('region', ''), fav.get('major_requirement', ''),
-            fav.get('education_requirement', ''), fav.get('apply_time', ''),
-            fav.get('exam_time', ''), fav.get('interview_time', ''),
-            fav.get('job_url', ''), fav.get('source_url', ''),
-            fav.get('match_status', '未判断'), fav.get('priority', '可以关注'),
-            fav.get('current_action', '待确认'), fav.get('note', ''),
-            now, now
-        ))
-        fav_count += 1
+            cur = conn.execute("""
+                INSERT INTO opportunities
+                (track, name, category, priority, region, fit_computer_master,
+                 expected_announcement_time, expected_apply_time,
+                 expected_exam_time, expected_interview_time,
+                 official_url, announcement_url, position_url, apply_url,
+                 status, current_action, note, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                opp.get('track', ''), opp.get('name', ''),
+                opp.get('category', ''), opp.get('priority', '可以关注'),
+                opp.get('region', '全国'), opp.get('fit_computer_master', '待确认'),
+                opp.get('expected_announcement_time', ''),
+                opp.get('expected_apply_time', ''),
+                opp.get('expected_exam_time', ''),
+                opp.get('expected_interview_time', ''),
+                opp.get('official_url', ''), opp.get('announcement_url', ''),
+                opp.get('position_url', ''), opp.get('apply_url', ''),
+                opp.get('status', '待更新'), opp.get('current_action', '持续关注'),
+                opp.get('note', ''), now, now
+            ))
+            new_id = cur.lastrowid
+            old_id = opp.get('id')
+            if old_id is not None:
+                old_opp_id_to_new_id[str(old_id)] = new_id
+            opp_name_to_new_id[opp.get('name', '')] = new_id
+            opp_count += 1
 
-    conn.commit()
-    conn.close()
+        def mapped_opportunity_id(raw_id, fallback_name=''):
+            if raw_id is not None and str(raw_id).strip() != '':
+                mapped = old_opp_id_to_new_id.get(str(raw_id))
+                if mapped:
+                    return mapped
+                # 追加导入时，原 ID 可能仍然有效，保留它。
+                exists = conn.execute(
+                    "SELECT 1 FROM opportunities WHERE id = ?",
+                    (raw_id,)
+                ).fetchone()
+                if exists:
+                    return raw_id
+            if fallback_name:
+                return opp_name_to_new_id.get(fallback_name)
+            return None
+
+        ev_count = 0
+        for ev in data.get('timeline', []):
+            if not ev.get('title') or not ev.get('month'):
+                continue
+
+            opp_id = mapped_opportunity_id(ev.get('opportunity_id'))
+            conn.execute("""
+                INSERT INTO timeline_events
+                (month, date, title, track, category, status, link, note, created_at, updated_at,
+                 event_date, date_precision, end_date, current_action, opportunity_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                ev.get('month', ''), ev.get('date', ''),
+                ev.get('title', ''), ev.get('track', ''),
+                ev.get('category', ''), ev.get('status', '待更新'),
+                ev.get('link', ''), ev.get('note', ''), now, now,
+                ev.get('event_date', ''), ev.get('date_precision', 'month'),
+                ev.get('end_date', ''), ev.get('current_action', ''),
+                opp_id
+            ))
+            ev_count += 1
+
+        fav_count = 0
+        for fav in data.get('job_favorites', []):
+            if not fav.get('job_name'):
+                continue
+
+            opp_id = mapped_opportunity_id(
+                fav.get('opportunity_id'),
+                fav.get('opportunity_name', '')
+            )
+            conn.execute("""
+                INSERT INTO job_favorites
+                (job_name, opportunity_name, track, organization, region,
+                 major_requirement, education_requirement, apply_time, exam_time, interview_time,
+                 job_url, source_url, match_status, priority, current_action, note,
+                 created_at, updated_at, opportunity_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                fav.get('job_name', ''), fav.get('opportunity_name', ''),
+                fav.get('track', ''), fav.get('organization', ''),
+                fav.get('region', ''), fav.get('major_requirement', ''),
+                fav.get('education_requirement', ''), fav.get('apply_time', ''),
+                fav.get('exam_time', ''), fav.get('interview_time', ''),
+                fav.get('job_url', ''), fav.get('source_url', ''),
+                fav.get('match_status', '未判断'), fav.get('priority', '可以关注'),
+                fav.get('current_action', '待确认'), fav.get('note', ''),
+                now, now, opp_id
+            ))
+            fav_count += 1
+
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'ok': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+    # 导入后再做一次历史弱关联回填和孤儿清理，避免旧备份丢关联。
+    backfill_opportunity_id()
+    cleanup_orphaned_data()
+
     mode = '覆盖' if overwrite else '追加'
     return jsonify({
         'ok': True,
@@ -1025,78 +1072,23 @@ def reset_data():
     if not os.path.exists(SEED_PATH):
         return jsonify({'error': f'未找到 seed 文件: {SEED_PATH}'}), 404
 
-    with open(SEED_PATH, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     conn = get_db()
-    conn.execute("DELETE FROM opportunities")
-    conn.execute("DELETE FROM timeline_events")
-    conn.execute("DELETE FROM job_favorites")
+    try:
+        conn.execute("DELETE FROM opportunities")
+        conn.execute("DELETE FROM timeline_events")
+        conn.execute("DELETE FROM job_favorites")
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'ok': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
 
-    for opp in data.get('opportunities', []):
-        conn.execute("""
-            INSERT INTO opportunities
-            (track, name, category, priority, region, fit_computer_master,
-             expected_announcement_time, expected_apply_time,
-             expected_exam_time, expected_interview_time,
-             official_url, announcement_url, position_url, apply_url,
-             status, current_action, note, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            opp.get('track', ''), opp.get('name', ''),
-            opp.get('category', ''), opp.get('priority', '可以关注'),
-            opp.get('region', '全国'), opp.get('fit_computer_master', '待确认'),
-            opp.get('expected_announcement_time', ''),
-            opp.get('expected_apply_time', ''),
-            opp.get('expected_exam_time', ''),
-            opp.get('expected_interview_time', ''),
-            opp.get('official_url', ''), opp.get('announcement_url', ''),
-            opp.get('position_url', ''), opp.get('apply_url', ''),
-            opp.get('status', '待更新'), opp.get('current_action', '持续关注'),
-            opp.get('note', ''), now, now
-        ))
+    seeded = seed_db()
+    backfill_opportunity_id()
+    cleanup_orphaned_data()
 
-    for ev in data.get('timeline', []):
-        conn.execute("""
-            INSERT INTO timeline_events
-            (month, date, title, track, category, status, link, note, created_at, updated_at,
-             event_date, date_precision, end_date, current_action)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            ev.get('month', ''), ev.get('date', ''),
-            ev.get('title', ''), ev.get('track', ''),
-            ev.get('category', ''), ev.get('status', '待更新'),
-            ev.get('link', ''), ev.get('note', ''), now, now,
-            ev.get('event_date', ''), ev.get('date_precision', 'month'),
-            ev.get('end_date', ''), ev.get('current_action', '')
-        ))
-
-    for fav in data.get('job_favorites', []):
-        if not fav.get('job_name'):
-            continue
-        conn.execute("""
-            INSERT INTO job_favorites
-            (job_name, opportunity_name, track, organization, region,
-             major_requirement, education_requirement, apply_time, exam_time, interview_time,
-             job_url, source_url, match_status, priority, current_action, note,
-             created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            fav.get('job_name', ''), fav.get('opportunity_name', ''),
-            fav.get('track', ''), fav.get('organization', ''),
-            fav.get('region', ''), fav.get('major_requirement', ''),
-            fav.get('education_requirement', ''), fav.get('apply_time', ''),
-            fav.get('exam_time', ''), fav.get('interview_time', ''),
-            fav.get('job_url', ''), fav.get('source_url', ''),
-            fav.get('match_status', '未判断'), fav.get('priority', '可以关注'),
-            fav.get('current_action', '待确认'), fav.get('note', ''),
-            now, now
-        ))
-
-    conn.commit()
-    conn.close()
-    return jsonify({'ok': True})
+    return jsonify({'ok': True, 'seeded': seeded})
 
 
 # ============================================================
