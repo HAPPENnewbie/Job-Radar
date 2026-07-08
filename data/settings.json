@@ -15,5 +15,19 @@
   "default_track": "all",
   "default_priority": "",
   "sidebar_default_collapsed": false,
+  "categories": [
+    {
+      "track": "体制",
+      "categories": [
+        "公务员\\n事业单位\\n烟草\\n银行"
+      ]
+    },
+    {
+      "track": "互联网",
+      "categories": [
+        "计算机秋招"
+      ]
+    }
+  ],
   "note": ""
 }

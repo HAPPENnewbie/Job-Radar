@@ -8,6 +8,7 @@ import sqlite3
 import os
 import json
 import re
+import copy
 from datetime import datetime
 
 app = Flask(__name__)
@@ -16,6 +17,11 @@ DATA_DIR = os.path.join(BASE_DIR, 'data')
 DB_PATH = os.path.join(DATA_DIR, 'app.db')
 SEED_PATH = os.path.join(BASE_DIR, 'seed', 'default_data.json')
 SETTINGS_PATH = os.path.join(DATA_DIR, 'settings.json')
+
+DEFAULT_CATEGORY_GROUPS = [
+    {'track': '体制/准体制', 'categories': ['公务员', '事业单位', '烟草', '国企/央企', '银行']},
+    {'track': '互联网/市场化', 'categories': ['计算机秋招', '互联网大厂', '中小厂', '远程岗位']},
+]
 
 DEFAULT_SETTINGS = {
     'app_name': '就业雷达',
@@ -34,6 +40,7 @@ DEFAULT_SETTINGS = {
     'default_track': 'all',
     'default_priority': '',
     'sidebar_default_collapsed': False,
+    'categories': DEFAULT_CATEGORY_GROUPS,
     'note': ''
 }
 
@@ -49,10 +56,56 @@ def month_str_is_valid(value):
     return isinstance(value, str) and re.match(r'^\d{4}-\d{2}$', value or '') is not None
 
 
+def normalize_categories(raw_categories=None):
+    """规范化用户自定义机会分类。只影响设置文件，不改数据库。"""
+    if raw_categories is None:
+        raw_categories = DEFAULT_CATEGORY_GROUPS
+
+    groups = []
+    # 兼容 {"体制/准体制": ["公务员"]} 这种结构
+    if isinstance(raw_categories, dict):
+        raw_categories = [
+            {'track': track, 'categories': cats}
+            for track, cats in raw_categories.items()
+        ]
+
+    if not isinstance(raw_categories, list):
+        raw_categories = DEFAULT_CATEGORY_GROUPS
+
+    seen_tracks = set()
+    for item in raw_categories:
+        if not isinstance(item, dict):
+            continue
+        track = str(item.get('track', '') or '').strip()
+        if not track or track in seen_tracks:
+            continue
+
+        raw_items = item.get('categories', [])
+        if isinstance(raw_items, str):
+            raw_items = re.split(r'[，,\n]+', raw_items)
+        if not isinstance(raw_items, list):
+            raw_items = []
+
+        cats = []
+        seen_cats = set()
+        for cat in raw_items:
+            cat = str(cat or '').strip()
+            if cat and cat not in seen_cats:
+                cats.append(cat)
+                seen_cats.add(cat)
+
+        groups.append({'track': track, 'categories': cats})
+        seen_tracks.add(track)
+
+    if not groups:
+        return copy.deepcopy(DEFAULT_CATEGORY_GROUPS)
+    return groups
+
+
 def normalize_settings(raw=None):
     """合并并校验设置，避免前端写入异常值。"""
     raw = raw or {}
-    settings = DEFAULT_SETTINGS.copy()
+    settings = copy.deepcopy(DEFAULT_SETTINGS)
     for key in DEFAULT_SETTINGS.keys():
         if key in raw:
             settings[key] = raw[key]
@@ -76,9 +129,12 @@ def normalize_settings(raw=None):
     if settings['timeline_end'] < settings['timeline_start']:
         settings['timeline_start'], settings['timeline_end'] = settings['timeline_end'], settings['timeline_start']
 
+    settings['categories'] = normalize_categories(settings.get('categories'))
+
     if settings.get('default_todo_range') not in {'7d', '30d', '90d', 'all'}:
         settings['default_todo_range'] = DEFAULT_SETTINGS['default_todo_range']
-    if settings.get('default_track') not in {'all', '体制/准体制', '互联网/市场化'}:
+    allowed_tracks = {'all'} | {g['track'] for g in settings['categories']}
+    if settings.get('default_track') not in allowed_tracks:
         settings['default_track'] = DEFAULT_SETTINGS['default_track']
     if settings.get('default_priority') not in {'', '重点关注', '可以关注', '低频关注'}:
         settings['default_priority'] = DEFAULT_SETTINGS['default_priority']
@@ -90,13 +146,13 @@ def normalize_settings(raw=None):
 def get_app_settings():
     os.makedirs(DATA_DIR, exist_ok=True)
     if not os.path.exists(SETTINGS_PATH):
-        return DEFAULT_SETTINGS.copy()
+        return copy.deepcopy(DEFAULT_SETTINGS)
     try:
         with open(SETTINGS_PATH, 'r', encoding='utf-8') as f:
             return normalize_settings(json.load(f))
     except Exception as e:
         print(f"[WARN] 读取设置失败，使用默认设置: {e}")
-        return DEFAULT_SETTINGS.copy()
+        return copy.deepcopy(DEFAULT_SETTINGS)
 
 
 def save_app_settings(data):
@@ -589,7 +645,7 @@ def update_settings_api():
 
 @app.route('/api/settings/reset', methods=['POST'])
 def reset_settings_api():
-    settings = save_app_settings(DEFAULT_SETTINGS.copy())
+    settings = save_app_settings(copy.deepcopy(DEFAULT_SETTINGS))
     return jsonify({'ok': True, 'settings': settings})
 
 

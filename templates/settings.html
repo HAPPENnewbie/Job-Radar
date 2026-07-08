@@ -87,6 +87,19 @@
         <p class="setting-note">保存后，时间日历和横向时间线会按这里的起止月份展示。改动后建议刷新页面。</p>
     </section>
 
+    <section class="section category-settings-section">
+        <div class="section-header-row">
+            <div>
+                <h2 class="section-title">机会分类管理</h2>
+                <p class="setting-note">大类会显示在机会管理顶部筛选；二级分类会作为“具体类别”的下拉选项。修改后保存设置并刷新即可生效。</p>
+            </div>
+            <button type="button" id="btn-add-category-group" class="btn btn-secondary btn-sm">+ 新增大类</button>
+        </div>
+        <div id="category-manager" class="category-manager">
+            <p class="placeholder">加载分类中...</p>
+        </div>
+    </section>
+
     <section class="section">
         <h2 class="section-title">默认筛选</h2>
         <div class="settings-grid">
@@ -94,8 +107,6 @@
                 <label>默认机会大类</label>
                 <select id="setting-default-track" name="default_track">
                     <option value="all">全部</option>
-                    <option value="体制/准体制">体制 / 准体制</option>
-                    <option value="互联网/市场化">互联网 / 市场化</option>
                 </select>
             </div>
             <div class="form-group">
@@ -190,6 +201,83 @@
         if (total) total.value = monthTotal(start, end);
     }
 
+    const defaultCategories = [
+        {track: '体制/准体制', categories: ['公务员', '事业单位', '烟草', '国企/央企', '银行']},
+        {track: '互联网/市场化', categories: ['计算机秋招', '互联网大厂', '中小厂', '远程岗位']}
+    ];
+
+    function normalizeCategoryGroups(raw) {
+        const source = Array.isArray(raw) && raw.length ? raw : defaultCategories;
+        const seenTracks = new Set();
+        return source.map(group => {
+            const track = String(group.track || '').trim();
+            let cats = group.categories || [];
+            if (typeof cats === 'string') cats = cats.split(/[，,\n]+/);
+            const seenCats = new Set();
+            cats = (Array.isArray(cats) ? cats : [])
+                .map(v => String(v || '').trim())
+                .filter(v => {
+                    if (!v || seenCats.has(v)) return false;
+                    seenCats.add(v);
+                    return true;
+                });
+            return {track, categories: cats};
+        }).filter(group => {
+            if (!group.track || seenTracks.has(group.track)) return false;
+            seenTracks.add(group.track);
+            return true;
+        });
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function renderCategoryManager(categories) {
+        const box = $s('category-manager');
+        if (!box) return;
+        const groups = normalizeCategoryGroups(categories);
+        box.innerHTML = groups.map((group, index) => `
+            <div class="category-editor-row" data-index="${index}">
+                <div class="form-group category-track-field">
+                    <label>机会大类</label>
+                    <input type="text" class="category-track-input" value="${escapeHtml(group.track)}" placeholder="如：体制/准体制">
+                </div>
+                <div class="form-group category-items-field">
+                    <label>二级分类</label>
+                    <textarea class="category-items-input" rows="3" placeholder="每行一个，或用逗号分隔">${escapeHtml(group.categories.join('\\n'))}</textarea>
+                </div>
+                <button type="button" class="btn btn-danger btn-sm btn-remove-category" aria-label="删除分类组">删除</button>
+            </div>
+        `).join('');
+    }
+
+    function readCategories() {
+        const rows = Array.from(document.querySelectorAll('.category-editor-row'));
+        const groups = rows.map(row => {
+            const track = row.querySelector('.category-track-input')?.value.trim() || '';
+            const raw = row.querySelector('.category-items-input')?.value || '';
+            const categories = raw.split(/[，,\n]+/).map(v => v.trim()).filter(Boolean);
+            return {track, categories};
+        }).filter(group => group.track);
+        return normalizeCategoryGroups(groups);
+    }
+
+    function populateDefaultTrackSelect(categories, selected) {
+        const select = $s('setting-default-track');
+        if (!select) return;
+        const groups = normalizeCategoryGroups(categories);
+        select.innerHTML = '<option value="all">全部</option>' + groups.map(group => (
+            `<option value="${escapeHtml(group.track)}">${escapeHtml(group.track)}</option>`
+        )).join('');
+        select.value = selected && Array.from(select.options).some(opt => opt.value === selected) ? selected : 'all';
+    }
+
     function fillForm(settings) {
         Object.entries(fieldMap).forEach(([key, id]) => {
             const el = $s(id);
@@ -197,6 +285,8 @@
         });
         const collapsed = $s('setting-sidebar-collapsed');
         if (collapsed) collapsed.checked = !!settings.sidebar_default_collapsed;
+        renderCategoryManager(settings.categories);
+        populateDefaultTrackSelect(settings.categories, settings.default_track || 'all');
         updateTimelineTotal();
         setStatus('已加载', 'ok');
     }
@@ -208,6 +298,7 @@
             if (el) data[key] = el.value.trim ? el.value.trim() : el.value;
         });
         data.sidebar_default_collapsed = !!$s('setting-sidebar-collapsed')?.checked;
+        data.categories = readCategories();
         return data;
     }
 
@@ -274,6 +365,23 @@
         if (form) form.addEventListener('submit', saveSettings);
         const resetBtn = $s('btn-reset-settings');
         if (resetBtn) resetBtn.addEventListener('click', resetSettings);
+        const addCategoryBtn = $s('btn-add-category-group');
+        if (addCategoryBtn) addCategoryBtn.addEventListener('click', () => {
+            const current = readCategories();
+            current.push({track: '', categories: []});
+            renderCategoryManager(current);
+        });
+        const categoryManager = $s('category-manager');
+        if (categoryManager) categoryManager.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-remove-category');
+            if (!btn) return;
+            const row = btn.closest('.category-editor-row');
+            if (row) row.remove();
+            if (!document.querySelector('.category-editor-row')) renderCategoryManager(defaultCategories);
+        });
+        if (categoryManager) categoryManager.addEventListener('input', () => {
+            populateDefaultTrackSelect(readCategories(), $s('setting-default-track')?.value || 'all');
+        });
         const clearSidebarBtn = $s('btn-clear-sidebar-cache');
         if (clearSidebarBtn) clearSidebarBtn.addEventListener('click', () => {
             try { localStorage.removeItem('jrSidebarCollapsed'); } catch (e) {}

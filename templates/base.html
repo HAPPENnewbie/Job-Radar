@@ -163,15 +163,16 @@
                 <div class="form-group">
                     <label>机会大类 <span class="required">*</span></label>
                     <select id="opp-track" required>
-                        <option value="体制/准体制">体制 / 准体制</option>
-                        <option value="互联网/市场化">互联网 / 市场化</option>
+                        <option value="">加载分类中...</option>
                     </select>
                 </div>
             </div>
             <div class="form-row">
                 <div class="form-group">
                     <label>具体类别 <span class="required">*</span></label>
-                    <input type="text" id="opp-category" required placeholder="如：国考、互联网大厂">
+                    <select id="opp-category" required>
+                        <option value="">请先选择机会大类</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>关注优先级</label>
@@ -335,13 +336,14 @@
             <div class="form-row">
                 <div class="form-group">
                     <label>所属类别</label>
-                    <input type="text" id="event-category" placeholder="如：国考">
+                    <select id="event-category">
+                        <option value="">请先选择机会大类</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>机会大类</label>
                     <select id="event-track">
-                        <option value="体制/准体制">体制 / 准体制</option>
-                        <option value="互联网/市场化">互联网 / 市场化</option>
+                        <option value="">加载分类中...</option>
                     </select>
                 </div>
             </div>
