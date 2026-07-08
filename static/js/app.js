@@ -242,6 +242,51 @@ function safeInvoke(name, fn) {
     }
 }
 
+const DATA_SYNC_KEY = 'jobRadar:dataChangedAt';
+let externalReloadTimer = null;
+let lastLocalMutationAt = 0;
+
+function notifyDataChanged() {
+    lastLocalMutationAt = Date.now();
+    try {
+        localStorage.setItem(DATA_SYNC_KEY, String(lastLocalMutationAt));
+    } catch (err) {
+        // localStorage 可能被浏览器隐私设置禁用；禁用时只影响跨标签页自动刷新。
+    }
+}
+
+function scheduleExternalDataReload() {
+    if (externalReloadTimer) clearTimeout(externalReloadTimer);
+    externalReloadTimer = setTimeout(async () => {
+        try {
+            await loadData();
+            if (typeof window.reloadCalendarData === 'function') await window.reloadCalendarData();
+        } catch (err) {
+            console.error('跨标签页刷新失败', err);
+        }
+    }, 120);
+}
+
+function bindCrossTabDataSync() {
+    if (window.__jobRadarCrossTabBound) return;
+    window.__jobRadarCrossTabBound = true;
+
+    window.addEventListener('storage', (event) => {
+        if (event.key !== DATA_SYNC_KEY) return;
+        const changedAt = Number(event.newValue || 0);
+        if (!changedAt || changedAt === lastLocalMutationAt) return;
+        scheduleExternalDataReload();
+    });
+
+    window.addEventListener('focus', () => {
+        scheduleExternalDataReload();
+    });
+
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) scheduleExternalDataReload();
+    });
+}
+
 async function fetchJson(url, options = {}) {
     const resp = await fetch(url, options);
     const data = await resp.json().catch(() => ({}));
@@ -251,6 +296,8 @@ async function fetchJson(url, options = {}) {
         err.data = data;
         throw err;
     }
+    const method = String(options.method || 'GET').toUpperCase();
+    if (method !== 'GET') notifyDataChanged();
     return data;
 }
 
@@ -432,6 +479,7 @@ document.addEventListener('DOMContentLoaded', init);
 
 function init() {
     installWindowFunctions();
+    bindCrossTabDataSync();
     bindSidebar();
     bindCommonEvents();
     loadData();

@@ -263,6 +263,9 @@ def init_db():
             updated_at TEXT NOT NULL DEFAULT '',
             opportunity_id INTEGER DEFAULT NULL
         );
+
+        CREATE INDEX IF NOT EXISTS idx_timeline_opportunity_id ON timeline_events(opportunity_id);
+        CREATE INDEX IF NOT EXISTS idx_favorites_opportunity_id ON job_favorites(opportunity_id);
     """)
     conn.commit()
     conn.close()
@@ -313,6 +316,9 @@ def migrate_timeline_fields():
         fav_columns = [row[1] for row in cursor.fetchall()]
         if 'opportunity_id' not in fav_columns:
             conn.execute("ALTER TABLE job_favorites ADD COLUMN opportunity_id INTEGER DEFAULT NULL")
+
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_timeline_opportunity_id ON timeline_events(opportunity_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_favorites_opportunity_id ON job_favorites(opportunity_id)")
 
         conn.commit()
     except Exception as e:
@@ -574,27 +580,73 @@ def row_to_event(row):
 
 
 def row_to_fav(row):
+    """序列化收藏。若已关联机会，优先使用机会表中的实时字段，避免收藏页显示旧副本。"""
+    keys = set(row.keys()) if hasattr(row, 'keys') else set()
+
+    def rv(key, default=''):
+        try:
+            value = row[key]
+        except Exception:
+            return default
+        return default if value is None else value
+
+    linked_live = 'opp_name_live' in keys and rv('opp_name_live', None) not in (None, '')
+    stored_opp_name = rv('opportunity_name')
+    live_opp_name = rv('opp_name_live') if linked_live else stored_opp_name
+    stored_job_name = rv('job_name')
+    stored_org = rv('organization')
+
+    # 如果岗位名/单位原本只是机会名称副本，则跟随机会名更新；如果用户改成具体岗位名，则保留用户值。
+    job_name = stored_job_name
+    if live_opp_name and (not stored_job_name or stored_job_name == stored_opp_name):
+        job_name = live_opp_name
+
+    organization = stored_org
+    if live_opp_name and (not stored_org or stored_org == stored_opp_name):
+        organization = live_opp_name
+
+    if linked_live:
+        track = rv('opp_track_live')
+        region = rv('opp_region_live')
+        priority = rv('opp_priority_live')
+        current_action = rv('opp_action_live')
+        apply_time = rv('opp_apply_time_live')
+        exam_time = rv('opp_exam_time_live')
+        interview_time = rv('opp_interview_time_live')
+        job_url = rv('opp_position_url_live') or rv('opp_apply_url_live') or rv('opp_official_url_live')
+        source_url = rv('opp_announcement_url_live') or rv('opp_official_url_live')
+    else:
+        track = rv('track')
+        region = rv('region')
+        priority = rv('priority')
+        current_action = rv('current_action')
+        apply_time = rv('apply_time')
+        exam_time = rv('exam_time')
+        interview_time = rv('interview_time')
+        job_url = rv('job_url')
+        source_url = rv('source_url')
+
     return {
-        'id': row['id'],
-        'job_name': row['job_name'],
-        'opportunity_name': row['opportunity_name'],
-        'track': row['track'],
-        'organization': row['organization'],
-        'region': row['region'],
-        'major_requirement': row['major_requirement'],
-        'education_requirement': row['education_requirement'],
-        'apply_time': row['apply_time'],
-        'exam_time': row['exam_time'],
-        'interview_time': row['interview_time'],
-        'job_url': row['job_url'],
-        'source_url': row['source_url'],
-        'match_status': row['match_status'],
-        'priority': row['priority'],
-        'current_action': row['current_action'],
-        'note': row['note'],
-        'created_at': row['created_at'],
-        'updated_at': row['updated_at'],
-        'opportunity_id': row['opportunity_id']
+        'id': rv('id'),
+        'job_name': job_name,
+        'opportunity_name': live_opp_name,
+        'track': track,
+        'organization': organization,
+        'region': region,
+        'major_requirement': rv('major_requirement'),
+        'education_requirement': rv('education_requirement'),
+        'apply_time': apply_time,
+        'exam_time': exam_time,
+        'interview_time': interview_time,
+        'job_url': job_url,
+        'source_url': source_url,
+        'match_status': rv('match_status'),
+        'priority': priority,
+        'current_action': current_action,
+        'note': rv('note'),
+        'created_at': rv('created_at'),
+        'updated_at': rv('updated_at'),
+        'opportunity_id': rv('opportunity_id', None)
     }
 
 
@@ -780,6 +832,53 @@ def update_opportunity(oid):
         conn.close()
 
 
+
+
+def normalize_nullable_id(value):
+    """把前端传来的空字符串/None 统一成 None，非空值转 int。"""
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return int(text)
+    except (TypeError, ValueError):
+        return None
+
+
+def auto_event_titles_for_opp_name(name):
+    return [
+        f"{name} 公告发布",
+        f"{name} 报名/投递",
+        f"{name} 笔试/测评",
+        f"{name} 面试",
+    ] if name else []
+
+
+def favorite_join_select(where='', order_by='f.id DESC'):
+    """收藏查询统一从机会表取实时字段，避免不同页面数据副本不同步。"""
+    where_sql = f"WHERE {where}" if where else ''
+    return f"""
+        SELECT f.*,
+               o.name AS opp_name_live,
+               o.track AS opp_track_live,
+               o.region AS opp_region_live,
+               o.priority AS opp_priority_live,
+               o.current_action AS opp_action_live,
+               o.expected_apply_time AS opp_apply_time_live,
+               o.expected_exam_time AS opp_exam_time_live,
+               o.expected_interview_time AS opp_interview_time_live,
+               o.position_url AS opp_position_url_live,
+               o.apply_url AS opp_apply_url_live,
+               o.official_url AS opp_official_url_live,
+               o.announcement_url AS opp_announcement_url_live
+        FROM job_favorites f
+        LEFT JOIN opportunities o ON CAST(f.opportunity_id AS TEXT) = CAST(o.id AS TEXT)
+        {where_sql}
+        ORDER BY {order_by}
+    """
+
 @app.route('/api/opportunities/<int:oid>', methods=['DELETE'])
 def delete_opportunity(oid):
     conn = get_db()
@@ -792,33 +891,35 @@ def delete_opportunity(oid):
         opp_category = opp['category'] or ''
         opp_track = opp['track'] or ''
 
-        category_count = conn.execute("""
-            SELECT COUNT(*) FROM opportunities WHERE category = ? AND track = ?
-        """, (opp_category, opp_track)).fetchone()[0]
-        category_unique = 1 if category_count == 1 else 0
-
+        # 删除已通过 opportunity_id 明确关联的记录。
         deleted_events = conn.execute("""
             DELETE FROM timeline_events
             WHERE CAST(opportunity_id AS TEXT) = CAST(? AS TEXT)
-               OR (
-                    (opportunity_id IS NULL OR TRIM(CAST(opportunity_id AS TEXT)) = '')
-                    AND track = ?
-                    AND (
-                        title LIKE ? OR note LIKE ? OR (? = 1 AND category = ?)
-                    )
-               )
-        """, (oid, opp_track, f"%{opp_name}%", f"%{opp_name}%", category_unique, opp_category)).rowcount
+        """, (oid,)).rowcount
 
         deleted_favorites = conn.execute("""
             DELETE FROM job_favorites
             WHERE CAST(opportunity_id AS TEXT) = CAST(? AS TEXT)
-               OR (
-                    (opportunity_id IS NULL OR TRIM(CAST(opportunity_id AS TEXT)) = '')
-                    AND (
-                        opportunity_name = ? OR opportunity_name LIKE ? OR job_name LIKE ? OR note LIKE ?
-                    )
-               )
-        """, (oid, opp_name, f"%{opp_name}%", f"%{opp_name}%", f"%{opp_name}%")).rowcount
+        """, (oid,)).rowcount
+
+        # 兼容旧数据：只删除“完全像自动生成副本”的未关联记录，避免 LIKE 误删相似机会。
+        auto_titles = auto_event_titles_for_opp_name(opp_name)
+        if auto_titles:
+            placeholders = ','.join(['?'] * len(auto_titles))
+            deleted_events += conn.execute(f"""
+                DELETE FROM timeline_events
+                WHERE (opportunity_id IS NULL OR TRIM(CAST(opportunity_id AS TEXT)) = '')
+                  AND track = ?
+                  AND category = ?
+                  AND title IN ({placeholders})
+            """, [opp_track, opp_category, *auto_titles]).rowcount
+
+        deleted_favorites += conn.execute("""
+            DELETE FROM job_favorites
+            WHERE (opportunity_id IS NULL OR TRIM(CAST(opportunity_id AS TEXT)) = '')
+              AND opportunity_name = ?
+              AND (job_name = ? OR organization = ? OR job_name = '' OR organization = '')
+        """, (opp_name, opp_name, opp_name)).rowcount
 
         deleted_opp = conn.execute("DELETE FROM opportunities WHERE id = ?", (oid,)).rowcount
         conn.commit()
@@ -879,6 +980,11 @@ def insert_favorite(conn, payload, now):
     return cur.lastrowid
 
 
+def get_favorite_row(conn, favorite_id):
+    return conn.execute(favorite_join_select("f.id = ?", "f.id DESC"), (favorite_id,)).fetchone()
+
+
+
 @app.route('/api/opportunities/<int:oid>/favorite', methods=['POST'])
 def favorite_opportunity(oid):
     data = request.get_json() or {}
@@ -894,12 +1000,12 @@ def favorite_opportunity(oid):
             (oid,)
         ).fetchone()
         if existing:
-            return jsonify({'ok': True, 'created': False, 'favorite': row_to_fav(existing)})
+            return jsonify({'ok': True, 'created': False, 'favorite': row_to_fav(get_favorite_row(conn, existing['id']) or existing)})
 
         payload = favorite_payload_from_opp(opp, data)
         new_id = insert_favorite(conn, payload, now)
         conn.commit()
-        row = conn.execute("SELECT * FROM job_favorites WHERE id = ?", (new_id,)).fetchone()
+        row = get_favorite_row(conn, new_id)
         return jsonify({'ok': True, 'created': True, 'favorite': row_to_fav(row)}), 201
     except Exception as e:
         conn.rollback()
@@ -1271,6 +1377,31 @@ def sync_opportunity_timeline(oid):
         conn.close()
 
 
+
+
+def hydrate_event_from_opportunity(conn, data, old_event=None):
+    """时间节点绑定机会后，后端统一继承机会大类、类别、状态、动作和默认链接。"""
+    data = dict(data or {})
+    opp_id = normalize_nullable_id(data.get('opportunity_id'))
+    if opp_id is None:
+        if 'opportunity_id' in data:
+            data['opportunity_id'] = None
+        return data
+
+    opp = conn.execute("SELECT * FROM opportunities WHERE id = ?", (opp_id,)).fetchone()
+    if not opp:
+        raise ValueError('关联机会不存在')
+
+    event_type = data.get('event_type') or (row_value(old_event, 'event_type') if old_event else '') or '其他'
+    data['opportunity_id'] = opp_id
+    data['track'] = opp['track'] or data.get('track', '')
+    data['category'] = opp['category'] or data.get('category', '')
+    data['status'] = data.get('status') or opp['status'] or '待更新'
+    data['current_action'] = data.get('current_action') or opp['current_action'] or ''
+    if not data.get('link'):
+        data['link'] = event_link_for_type(opp, event_type)
+    return data
+
 # ============================================================
 # 时间线 API
 # ============================================================
@@ -1347,24 +1478,38 @@ def create_event():
         return jsonify({'error': '标题不能为空'}), 400
 
     conn = get_db()
-    cur = conn.execute("""
-        INSERT INTO timeline_events
-        (month, date, title, track, category, status, link, note, created_at, updated_at,
-         event_date, date_precision, end_date, current_action, opportunity_id, event_type)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        data.get('month', ''), data.get('date', ''),
-        data.get('title', ''), data.get('track', ''),
-        data.get('category', ''), data.get('status', '待更新'),
-        data.get('link', ''), data.get('note', ''), now, now,
-        data.get('event_date', data.get('date', '')), data.get('date_precision', 'month'),
-        data.get('end_date', ''), data.get('current_action', ''),
-        data.get('opportunity_id'), data.get('event_type', '其他')
-    ))
-    conn.commit()
-    row = conn.execute("SELECT * FROM timeline_events WHERE id = ?", (cur.lastrowid,)).fetchone()
-    conn.close()
-    return jsonify(row_to_event(row)), 201
+    try:
+        data = hydrate_event_from_opportunity(conn, data)
+        cur = conn.execute("""
+            INSERT INTO timeline_events
+            (month, date, title, track, category, status, link, note, created_at, updated_at,
+             event_date, date_precision, end_date, current_action, opportunity_id, event_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            data.get('month', ''), data.get('date', ''),
+            data.get('title', ''), data.get('track', ''),
+            data.get('category', ''), data.get('status', '待更新'),
+            data.get('link', ''), data.get('note', ''), now, now,
+            data.get('event_date', data.get('date', '')), data.get('date_precision', 'month'),
+            data.get('end_date', ''), data.get('current_action', ''),
+            normalize_nullable_id(data.get('opportunity_id')), data.get('event_type', '其他')
+        ))
+        conn.commit()
+        row = conn.execute("""
+            SELECT t.*, o.name as opportunity_name
+            FROM timeline_events t
+            LEFT JOIN opportunities o ON t.opportunity_id = o.id
+            WHERE t.id = ?
+        """, (cur.lastrowid,)).fetchone()
+        return jsonify(row_to_event(row)), 201
+    except ValueError as e:
+        conn.rollback()
+        return jsonify({'ok': False, 'error': str(e)}), 400
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'ok': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
 
 
 @app.route('/api/timeline/<int:eid>', methods=['PUT'])
@@ -1373,27 +1518,44 @@ def update_event(eid):
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     fields = ['month', 'date', 'title', 'track', 'category', 'status', 'link', 'note',
               'event_date', 'date_precision', 'end_date', 'current_action', 'opportunity_id', 'event_type']
-    sets = []
-    params = []
-    for f in fields:
-        if f in data:
-            sets.append(f"{f} = ?")
-            params.append(data[f])
-    if not sets:
-        return jsonify({'error': '无可更新字段'}), 400
-
-    sets.append("updated_at = ?")
-    params.append(now)
-    params.append(eid)
 
     conn = get_db()
-    conn.execute(f"UPDATE timeline_events SET {', '.join(sets)} WHERE id = ?", params)
-    conn.commit()
-    row = conn.execute("SELECT * FROM timeline_events WHERE id = ?", (eid,)).fetchone()
-    conn.close()
-    if not row:
-        return jsonify({'error': '未找到该时间节点'}), 404
-    return jsonify(row_to_event(row))
+    try:
+        old = conn.execute("SELECT * FROM timeline_events WHERE id = ?", (eid,)).fetchone()
+        if not old:
+            return jsonify({'error': '未找到该时间节点'}), 404
+
+        data = hydrate_event_from_opportunity(conn, data, old_event=old)
+        sets = []
+        params = []
+        for f in fields:
+            if f in data:
+                sets.append(f"{f} = ?")
+                params.append(normalize_nullable_id(data[f]) if f == 'opportunity_id' else data[f])
+        if not sets:
+            return jsonify({'error': '无可更新字段'}), 400
+
+        sets.append("updated_at = ?")
+        params.append(now)
+        params.append(eid)
+
+        conn.execute(f"UPDATE timeline_events SET {', '.join(sets)} WHERE id = ?", params)
+        conn.commit()
+        row = conn.execute("""
+            SELECT t.*, o.name as opportunity_name
+            FROM timeline_events t
+            LEFT JOIN opportunities o ON t.opportunity_id = o.id
+            WHERE t.id = ?
+        """, (eid,)).fetchone()
+        return jsonify(row_to_event(row))
+    except ValueError as e:
+        conn.rollback()
+        return jsonify({'ok': False, 'error': str(e)}), 400
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'ok': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
 
 
 @app.route('/api/timeline/<int:eid>', methods=['DELETE'])
@@ -1415,29 +1577,31 @@ def list_job_favorites():
     conditions = []
     params = []
 
-    for arg, column in [
-        ('track', 'track'),
-        ('region', 'region'),
-        ('match_status', 'match_status'),
-        ('priority', 'priority'),
-        ('current_action', 'current_action'),
-    ]:
+    # 过滤条件也使用机会表实时字段，否则机会修改后筛选结果会和显示内容不一致。
+    field_expr = {
+        'track': "COALESCE(o.track, f.track)",
+        'region': "COALESCE(o.region, f.region)",
+        'priority': "COALESCE(o.priority, f.priority)",
+        'current_action': "COALESCE(o.current_action, f.current_action)",
+        'match_status': "f.match_status",
+    }
+    for arg in ['track', 'region', 'match_status', 'priority', 'current_action']:
         value = request.args.get(arg, '').strip()
         if value and value != 'all':
-            conditions.append(f"{column} = ?")
+            conditions.append(f"{field_expr[arg]} = ?")
             params.append(value)
 
     q = request.args.get('q', '').strip()
     if q:
         conditions.append("""(
-            job_name LIKE ? OR organization LIKE ? OR major_requirement LIKE ? OR
-            education_requirement LIKE ? OR note LIKE ? OR opportunity_name LIKE ?
+            f.job_name LIKE ? OR f.organization LIKE ? OR f.major_requirement LIKE ? OR
+            f.education_requirement LIKE ? OR f.note LIKE ? OR COALESCE(o.name, f.opportunity_name) LIKE ?
         )""")
         like = f"%{q}%"
         params.extend([like] * 6)
 
-    where = "WHERE " + " AND ".join(conditions) if conditions else ""
-    rows = conn.execute(f"SELECT * FROM job_favorites {where} ORDER BY id DESC", params).fetchall()
+    where = " AND ".join(conditions)
+    rows = conn.execute(favorite_join_select(where), params).fetchall()
     conn.close()
     return jsonify([row_to_fav(r) for r in rows])
 
@@ -1462,12 +1626,12 @@ def create_job_favorite():
             (raw_opp_id,)
         ).fetchone()
         if existing:
-            return jsonify({'ok': True, 'created': False, 'favorite': row_to_fav(existing)})
+            return jsonify({'ok': True, 'created': False, 'favorite': row_to_fav(get_favorite_row(conn, existing['id']) or existing)})
 
         payload = favorite_payload_from_opp(opp, data)
         new_id = insert_favorite(conn, payload, now)
         conn.commit()
-        row = conn.execute("SELECT * FROM job_favorites WHERE id = ?", (new_id,)).fetchone()
+        row = get_favorite_row(conn, new_id)
         return jsonify(row_to_fav(row)), 201
     except Exception as e:
         conn.rollback()
@@ -1507,7 +1671,7 @@ def update_job_favorite(fid):
                 return jsonify({'ok': False, 'error': '关联机会不存在'}), 404
         conn.execute(f"UPDATE job_favorites SET {', '.join(sets)} WHERE id = ?", params)
         conn.commit()
-        row = conn.execute("SELECT * FROM job_favorites WHERE id = ?", (fid,)).fetchone()
+        row = get_favorite_row(conn, fid)
         if not row:
             return jsonify({'error': '未找到该岗位'}), 404
         return jsonify(row_to_fav(row))
@@ -1572,9 +1736,9 @@ def import_data():
 
     try:
         if overwrite:
-            conn.execute("DELETE FROM opportunities")
             conn.execute("DELETE FROM timeline_events")
             conn.execute("DELETE FROM job_favorites")
+            conn.execute("DELETE FROM opportunities")
 
         opp_count = 0
         for opp in data.get('opportunities', []):
@@ -1691,9 +1855,9 @@ def reset_data():
 
     conn = get_db()
     try:
-        conn.execute("DELETE FROM opportunities")
         conn.execute("DELETE FROM timeline_events")
         conn.execute("DELETE FROM job_favorites")
+        conn.execute("DELETE FROM opportunities")
         conn.commit()
     except Exception as e:
         conn.rollback()
