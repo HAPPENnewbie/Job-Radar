@@ -1337,3 +1337,325 @@ html.sidebar-collapsed .sidebar-resizer {
     html.sidebar-collapsed .sidebar-toggle { display: inline-flex !important; }
     html.sidebar-collapsed .sidebar-footer { display: block !important; }
 }
+
+/* ============================================================
+   Sidebar Premium Final Patch
+   目标：侧边展开按钮改为边缘浮动按钮；收起态比例修正；
+   展开态图标文字距离收紧；整体改为更克制的高级浅色系。
+   ============================================================ */
+:root {
+    --sidebar-w: 252px;
+    --sidebar-collapsed-w: 78px;
+    --sidebar-min-w: 220px;
+    --sidebar-max-w: 360px;
+    --sidebar-surface-1: #f7fbff;
+    --sidebar-surface-2: #edf5ff;
+    --sidebar-surface-3: #e6f0ff;
+    --sidebar-surface-4: #ddeafe;
+    --sidebar-line: rgba(112, 143, 188, .36);
+    --sidebar-text: #2f3b4e;
+    --sidebar-muted: #6d7c91;
+    --sidebar-active-text: #1f4fbf;
+    --sidebar-active-bg: rgba(255, 255, 255, .94);
+}
+
+.sidebar {
+    overflow: visible !important;
+    background:
+        radial-gradient(circle at 18% 0%, rgba(186, 214, 255, .66), transparent 34%),
+        radial-gradient(circle at 120% 30%, rgba(203, 213, 255, .34), transparent 30%),
+        linear-gradient(180deg, var(--sidebar-surface-1) 0%, var(--sidebar-surface-2) 46%, var(--sidebar-surface-3) 100%) !important;
+    border-right: 1px solid var(--sidebar-line) !important;
+    box-shadow:
+        18px 0 44px rgba(60, 86, 130, .13),
+        inset -1px 0 0 rgba(255, 255, 255, .82) !important;
+}
+.sidebar::before {
+    pointer-events: none;
+    background:
+        linear-gradient(145deg, rgba(255,255,255,.74), transparent 42%),
+        radial-gradient(circle at 96% 20%, rgba(37,99,235,.08), transparent 28%) !important;
+}
+
+.sidebar-header {
+    min-height: 94px !important;
+    padding: 18px 22px 16px !important;
+    justify-content: center !important;
+    align-items: center !important;
+    border-bottom: 1px solid rgba(133, 160, 199, .26) !important;
+}
+.brand-lockup {
+    width: auto !important;
+    max-width: calc(var(--sidebar-w) - 52px) !important;
+    margin: 0 auto !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+.brand-logo {
+    width: 36px !important;
+    height: 36px !important;
+    flex: 0 0 36px !important;
+    border-radius: 14px !important;
+    background: linear-gradient(145deg, #eaf4ff, #dff7ff) !important;
+    box-shadow:
+        0 10px 22px rgba(37, 99, 235, .13),
+        0 0 0 7px rgba(255,255,255,.36),
+        inset 0 1px 0 rgba(255,255,255,.92) !important;
+}
+.brand-logo svg { width: 29px !important; height: 29px !important; }
+.brand-wordmark {
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+    max-width: 122px !important;
+    align-items: flex-start !important;
+    overflow: hidden !important;
+}
+.brand-title {
+    display: block !important;
+    white-space: nowrap !important;
+    word-break: keep-all !important;
+    line-height: 1 !important;
+    font-size: 1.22rem !important;
+    letter-spacing: -.072em !important;
+    background: linear-gradient(105deg, #1e3a8a 0%, #2563eb 48%, #0891b2 100%) !important;
+    -webkit-background-clip: text !important;
+    background-clip: text !important;
+    color: transparent !important;
+}
+.brand-subtitle {
+    white-space: nowrap !important;
+    margin-top: 4px !important;
+    color: #7a8aa1 !important;
+    font-size: .62rem !important;
+    letter-spacing: .19em !important;
+}
+
+/* 侧边浮动展开/收起按钮：展开和收起状态都固定在菜单右侧边缘 */
+.sidebar-toggle {
+    position: fixed !important;
+    left: calc(var(--sidebar-w) - 18px) !important;
+    top: 28px !important;
+    right: auto !important;
+    transform: none !important;
+    z-index: 260 !important;
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 999px !important;
+    color: #40506a !important;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.96), rgba(236,243,252,.94)) !important;
+    border: 1px solid rgba(118, 146, 185, .38) !important;
+    box-shadow:
+        0 12px 28px rgba(40, 70, 115, .15),
+        0 0 0 5px rgba(255,255,255,.32),
+        inset 0 1px 0 rgba(255,255,255,.96) !important;
+    backdrop-filter: blur(14px);
+}
+.sidebar-toggle:hover {
+    transform: translateY(-1px) !important;
+    color: #1f4fbf !important;
+    background: #ffffff !important;
+    border-color: rgba(77, 133, 221, .48) !important;
+    box-shadow:
+        0 16px 34px rgba(40, 70, 115, .18),
+        0 0 0 5px rgba(255,255,255,.44),
+        inset 0 1px 0 rgba(255,255,255,1) !important;
+}
+.sidebar-toggle:active { transform: translateY(0) scale(.98) !important; }
+html.sidebar-collapsed .sidebar-toggle {
+    display: inline-flex !important;
+    left: calc(var(--sidebar-collapsed-w) - 18px) !important;
+    top: 26px !important;
+    position: fixed !important;
+    transform: none !important;
+}
+html.sidebar-collapsed .sidebar-toggle:hover { transform: translateY(-1px) !important; }
+
+.sidebar-nav {
+    flex: 1 1 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 7px !important;
+    padding: 18px 14px 12px !important;
+    overflow: hidden !important;
+}
+.nav-item {
+    width: min(198px, calc(100% - 12px)) !important;
+    display: flex !important;
+    grid-template-columns: none !important;
+    justify-content: center !important;
+    align-items: center !important;
+    column-gap: 0 !important;
+    gap: 11px !important;
+    min-height: 48px !important;
+    padding: 9px 14px !important;
+    margin: 0 auto !important;
+    border-radius: 16px !important;
+    color: var(--sidebar-text) !important;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    box-shadow: none !important;
+    transition:
+        transform 180ms cubic-bezier(.2,.8,.2,1),
+        background 180ms cubic-bezier(.2,.8,.2,1),
+        border-color 180ms cubic-bezier(.2,.8,.2,1),
+        box-shadow 180ms cubic-bezier(.2,.8,.2,1),
+        color 180ms cubic-bezier(.2,.8,.2,1) !important;
+}
+.nav-icon {
+    flex: 0 0 22px !important;
+    width: 22px !important;
+    height: 22px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: currentColor !important;
+}
+.nav-icon svg {
+    width: 19px !important;
+    height: 19px !important;
+    stroke-width: 1.95 !important;
+}
+.nav-text {
+    flex: 0 0 86px !important;
+    width: 86px !important;
+    min-width: 86px !important;
+    max-width: 86px !important;
+    text-align: left !important;
+    font-size: 1.02rem !important;
+    line-height: 1.2 !important;
+    font-weight: 760 !important;
+    letter-spacing: -.012em !important;
+    color: inherit !important;
+    white-space: nowrap !important;
+}
+.nav-item:hover {
+    color: #1f4fbf !important;
+    background: rgba(255,255,255,.62) !important;
+    border-color: rgba(143, 177, 224, .44) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 12px 26px rgba(55, 83, 126, .10), inset 0 1px 0 rgba(255,255,255,.78) !important;
+}
+.nav-item.active {
+    color: #1f4fbf !important;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.96), rgba(244,248,255,.92)) !important;
+    border-color: rgba(88, 145, 231, .58) !important;
+    box-shadow:
+        0 14px 30px rgba(45, 87, 160, .13),
+        inset 0 1px 0 rgba(255,255,255,.96),
+        inset 3px 0 0 rgba(58, 120, 232, .75) !important;
+}
+.nav-item.active .nav-icon { color: #2563eb !important; }
+
+.sidebar-footer {
+    margin-top: auto !important;
+    padding: 14px 16px 18px !important;
+    border-top: 1px solid rgba(133,160,199,.25) !important;
+    background: linear-gradient(180deg, transparent, rgba(255,255,255,.30)) !important;
+}
+.footer-powered {
+    min-height: 34px !important;
+    border-radius: 999px !important;
+    color: #66768b !important;
+    background: rgba(255,255,255,.62) !important;
+    border: 1px solid rgba(190, 207, 231, .72) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.88), 0 8px 18px rgba(55, 83, 126, .06) !important;
+    letter-spacing: .08em !important;
+}
+
+/* 收起状态：导航项保持方形比例，选中特效不再过高 */
+html.sidebar-collapsed .sidebar {
+    width: var(--sidebar-collapsed-w) !important;
+}
+html.sidebar-collapsed .main-content {
+    width: calc(100% - var(--sidebar-collapsed-w)) !important;
+    margin-left: var(--sidebar-collapsed-w) !important;
+}
+html.sidebar-collapsed .sidebar-header {
+    min-height: 82px !important;
+    padding: 14px 0 10px !important;
+    justify-content: center !important;
+    align-items: center !important;
+}
+html.sidebar-collapsed .brand-lockup {
+    width: 100% !important;
+    max-width: 100% !important;
+    justify-content: center !important;
+    gap: 0 !important;
+}
+html.sidebar-collapsed .brand-wordmark,
+html.sidebar-collapsed .nav-text,
+html.sidebar-collapsed .sidebar-footer {
+    display: none !important;
+}
+html.sidebar-collapsed .brand-logo {
+    width: 38px !important;
+    height: 38px !important;
+    flex-basis: 38px !important;
+    margin: 0 auto !important;
+}
+html.sidebar-collapsed .sidebar-nav {
+    align-items: center !important;
+    padding: 12px 0 !important;
+    gap: 8px !important;
+    overflow: visible !important;
+}
+html.sidebar-collapsed .nav-item {
+    width: 46px !important;
+    height: 46px !important;
+    min-height: 46px !important;
+    padding: 0 !important;
+    border-radius: 15px !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    margin: 0 auto !important;
+}
+html.sidebar-collapsed .nav-icon {
+    width: 22px !important;
+    height: 22px !important;
+    flex: 0 0 22px !important;
+}
+html.sidebar-collapsed .nav-icon svg {
+    width: 20px !important;
+    height: 20px !important;
+}
+html.sidebar-collapsed .nav-item.active {
+    background: rgba(255,255,255,.88) !important;
+    border-color: rgba(88,145,231,.54) !important;
+    box-shadow: 0 12px 24px rgba(45,87,160,.12), inset 0 1px 0 rgba(255,255,255,.92) !important;
+}
+html.sidebar-collapsed .nav-item.active::before,
+html.sidebar-collapsed .nav-item.active::after {
+    content: none !important;
+}
+html.sidebar-collapsed .sidebar-resizer { display: none !important; }
+
+/* 拖动时保持导航视觉中心稳定 */
+.sidebar:not(.open) .brand-lockup,
+.sidebar:not(.open) .nav-item {
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+@media (max-width: 1024px) {
+    .sidebar {
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+    }
+    .sidebar-toggle {
+        position: absolute !important;
+        left: auto !important;
+        right: 14px !important;
+        top: 28px !important;
+    }
+    .sidebar-header {
+        padding-right: 60px !important;
+    }
+    .nav-item {
+        width: min(198px, calc(100% - 12px)) !important;
+    }
+}
