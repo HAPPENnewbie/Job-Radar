@@ -20,21 +20,32 @@ const DEFAULT_CATEGORY_GROUPS = [
     { track: '互联网/市场化', categories: ['计算机秋招', '互联网大厂', '中小厂', '远程岗位'] },
 ];
 
+function splitCategoryItems(value) {
+    if (value === null || value === undefined) return [];
+    return String(value)
+        .replace(/\\n/g, '\n')
+        .split(/[，,、;；\n\r/|]+/)
+        .map(v => v.trim())
+        .filter(Boolean);
+}
+
 function normalizeCategoryGroups(raw) {
     const source = Array.isArray(raw) && raw.length ? raw : DEFAULT_CATEGORY_GROUPS;
     const seenTracks = new Set();
     return source.map(group => {
         const track = String(group && group.track || '').trim();
         let categories = group && group.categories ? group.categories : [];
-        if (typeof categories === 'string') categories = categories.split(/[，,\n]+/);
+        if (typeof categories === 'string') categories = splitCategoryItems(categories);
+        const expanded = [];
+        (Array.isArray(categories) ? categories : []).forEach(item => {
+            expanded.push(...splitCategoryItems(item));
+        });
         const seenCats = new Set();
-        categories = (Array.isArray(categories) ? categories : [])
-            .map(v => String(v || '').trim())
-            .filter(v => {
-                if (!v || seenCats.has(v)) return false;
-                seenCats.add(v);
-                return true;
-            });
+        categories = expanded.filter(v => {
+            if (!v || seenCats.has(v)) return false;
+            seenCats.add(v);
+            return true;
+        });
         return { track, categories };
     }).filter(group => {
         if (!group.track || seenTracks.has(group.track)) return false;

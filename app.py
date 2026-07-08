@@ -45,6 +45,15 @@ DEFAULT_SETTINGS = {
 }
 
 CORE_EVENT_TYPES = ['公告', '报名/投递', '笔试/测评', '面试']
+CATEGORY_SPLIT_RE = re.compile(r'(?:\\n|\r\n|\r|\n|[，,、;；/|]+)+')
+
+
+def split_category_items(value):
+    """拆分二级分类，兼容真实换行和字面量 \\n。"""
+    if value is None:
+        return []
+    return [item.strip() for item in CATEGORY_SPLIT_RE.split(str(value)) if item.strip()]
+
 
 
 
@@ -82,13 +91,18 @@ def normalize_categories(raw_categories=None):
 
         raw_items = item.get('categories', [])
         if isinstance(raw_items, str):
-            raw_items = re.split(r'[，,\n]+', raw_items)
+            raw_items = split_category_items(raw_items)
         if not isinstance(raw_items, list):
             raw_items = []
 
+        expanded_items = []
+        for cat in raw_items:
+            # 兼容旧设置中把多个分类保存成一个字符串的情况，例如：公务员\n事业单位\n烟草
+            expanded_items.extend(split_category_items(cat))
+
         cats = []
         seen_cats = set()
-        for cat in raw_items:
+        for cat in expanded_items:
             cat = str(cat or '').strip()
             if cat and cat not in seen_cats:
                 cats.append(cat)

@@ -238,6 +238,15 @@
             .replace(/'/g, '&#39;');
     }
 
+    function splitCategoryItems(value) {
+        if (value === null || value === undefined) return [];
+        return String(value)
+            .replace(/\\n/g, '\n')
+            .split(/[，,、;；\n\r/|]+/)
+            .map(v => v.trim())
+            .filter(Boolean);
+    }
+
     function renderCategoryManager(categories) {
         const box = $s('category-manager');
         if (!box) return;
@@ -250,7 +259,7 @@
                 </div>
                 <div class="form-group category-items-field">
                     <label>二级分类</label>
-                    <textarea class="category-items-input" rows="3" placeholder="每行一个，或用逗号分隔">${escapeHtml(group.categories.join('\\n'))}</textarea>
+                    <textarea class="category-items-input" rows="3" placeholder="每行一个，或用逗号分隔">${escapeHtml(group.categories.join('\n'))}</textarea>
                 </div>
                 <button type="button" class="btn btn-danger btn-sm btn-remove-category" aria-label="删除分类组">删除</button>
             </div>
@@ -262,7 +271,7 @@
         const groups = rows.map(row => {
             const track = row.querySelector('.category-track-input')?.value.trim() || '';
             const raw = row.querySelector('.category-items-input')?.value || '';
-            const categories = raw.split(/[，,\n]+/).map(v => v.trim()).filter(Boolean);
+            const categories = splitCategoryItems(raw);
             return {track, categories};
         }).filter(group => group.track);
         return normalizeCategoryGroups(groups);
